@@ -6,7 +6,7 @@ import type { User as DBUser } from '@/lib/types';
 export const useSupabaseAuth = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<DBUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,8 +48,7 @@ export const useSupabaseAuth = () => {
         console.error('💥 Critical error during auth check:', err);
         setError('Failed to get user session');
       } finally {
-        console.log('✅ Auth check complete - setting loading to false');
-        setLoading(false);
+        console.log('✅ Auth check complete');
       }
     };
 
@@ -61,7 +60,6 @@ export const useSupabaseAuth = () => {
       async (event, session) => {
         console.log('🔄 Auth state change:', event, session?.user ? 'User present' : 'No user');
         setUser(session?.user ?? null);
-        setLoading(false);
         
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ User signed in, ensuring profile...');
@@ -128,7 +126,6 @@ export const useSupabaseAuth = () => {
   };
 
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
     setError(null);
     
     try {
@@ -142,13 +139,10 @@ export const useSupabaseAuth = () => {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(errorMessage);
       return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string }) => {
-    setLoading(true);
     setError(null);
     
     try {
@@ -162,8 +156,6 @@ export const useSupabaseAuth = () => {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(errorMessage);
       return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 

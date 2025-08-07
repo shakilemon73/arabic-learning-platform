@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 
 export default function SupabaseLogin() {
-  const { signIn, signUp, loading } = useSupabaseAuth();
+  const { signIn, signUp } = useSupabaseAuth();
   const { toast } = useToast();
   const [location] = useLocation();
   
@@ -165,10 +165,9 @@ export default function SupabaseLogin() {
                   <Button
                     type="submit"
                     className="w-full bg-islamic-green hover:bg-islamic-green/90"
-                    disabled={loading}
                     data-testid="button-signin"
                   >
-                    {loading ? "লগইন হচ্ছে..." : "লগইন"}
+                    লগইন
                   </Button>
                 </form>
               </TabsContent>
@@ -233,10 +232,9 @@ export default function SupabaseLogin() {
                   <Button
                     type="submit"
                     className="w-full bg-islamic-green hover:bg-islamic-green/90"
-                    disabled={loading}
                     data-testid="button-signup"
                   >
-                    {loading ? "নিবন্ধন হচ্ছে..." : "নিবন্ধন করুন"}
+                    নিবন্ধন করুন
                   </Button>
                 </form>
               </TabsContent>

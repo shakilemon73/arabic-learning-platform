@@ -14,23 +14,8 @@ import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 
 function Router() {
-  const { user, loading, error } = useSupabaseAuth();
+  const { user } = useSupabaseAuth();
   const isAuthenticated = !!user;
-  const isLoading = loading;
-
-  // Show simplified loading without timeout issues
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-soft-mint">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-islamic-green to-sage-green rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-bold">আ</span>
-          </div>
-          <p className="text-gray-600">লোড হচ্ছে...</p>
-        </div>
-      </div>
-    );
-  }
 
 
 
