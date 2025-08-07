@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getUserAttendance, getLiveClasses } from "@/lib/api";
 import { Link } from "wouter";
+import { format } from "date-fns";
 
 export default function Dashboard() {
   const { toast } = useToast();

@@ -3,34 +3,52 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, Clock, Users, Play, Pause } from 'lucide-react';
 import LiveClassroom from '@/components/LiveClassroom';
-// Mock user for demonstration
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { getLiveClasses, getLiveClassById } from '@/lib/api';
 
 export default function LiveClassPage() {
   const [, navigate] = useLocation();
-  const mockUser = { id: "demo-user-1", email: "user@example.com" };
+  const { user } = useAuth();
   const [isClassActive, setIsClassActive] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // Mock data for demonstration - in real app, this would come from URL params or query
-  const classData = {
-    id: 'class-123',
-    title: 'আরবি ব্যাকরণ - প্রাথমিক স্তর',
-    description: 'আরবি ব্যাকরণের মৌলিক বিষয়গুলো নিয়ে আলোচনা',
-    instructor: 'উস্তাদ আহমেদ হাসান',
-    scheduledTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
-    duration: 90,
-    maxParticipants: 30,
-    currentParticipants: 12,
-  };
-
-  const { data: upcomingClasses, isLoading } = useQuery({
-    queryKey: ['/api/upcoming-classes'],
+  // Get class ID from URL params
+  const classId = new URLSearchParams(window.location.search).get('id') || 'demo-class';
+  
+  // Fetch specific class data
+  const { data: classData, isLoading: classLoading } = useQuery({
+    queryKey: ['/api/live-class', classId],
+    queryFn: () => getLiveClassById(classId),
+    enabled: !!classId,
   });
 
-  const isInstructor = mockUser?.email === 'instructor@example.com'; // Mock check
+  // Fetch all classes as fallback
+  const { data: allClasses, isLoading: allClassesLoading } = useQuery({
+    queryKey: ['/api/live-classes'],
+    queryFn: () => getLiveClasses(),
+  });
+
+  const isLoading = classLoading || allClassesLoading;
+
+  // Use specific class or first available class
+  const selectedClass = classData || (allClasses && allClasses[0]) || {
+    id: 'demo-class',
+    title: 'আরবি ভাষা শিক্ষা',
+    title_bn: 'আরবি ভাষা শিক্ষা - ডেমো ক্লাস',
+    description: 'আরবি ভাষা শিক্ষার মৌলিক বিষয়সমূহ',
+    description_bn: 'আরবি ভাষা শিক্ষার মৌলিক বিষয়সমূহ',
+    scheduled_at: new Date().toISOString(),
+    duration: 90,
+    max_participants: 30,
+    current_participants: 5,
+    instructors: { name: 'উস্তাদ', name_bn: 'উস্তাদ আহমেদ', email: 'instructor@example.com' }
+  };
+
+  const isInstructor = user?.email === 'instructor@example.com'; // Check if current user is instructor
 
   const handleJoinClass = async () => {
     try {
@@ -41,7 +59,7 @@ export default function LiveClassPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          classId: classData.id,
+          classId: selectedClass.id,
         }),
       });
 
@@ -64,8 +82,8 @@ export default function LiveClassPage() {
       <LiveClassroom
         sessionId={sessionId}
         isInstructor={isInstructor}
-        classTitle={classData.title}
-        userId={mockUser.id}
+        classTitle={selectedClass.title_bn}
+        userId={user?.id || 'demo-user'}
       />
     );
   }
@@ -99,7 +117,7 @@ export default function LiveClassPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-headline font-bengali text-white">
-                    {classData.title}
+                    {selectedClass.title_bn}
                   </CardTitle>
                   <Badge variant="secondary" className="text-sm">
                     লাইভ ক্লাস
@@ -108,7 +126,7 @@ export default function LiveClassPage() {
               </CardHeader>
               <CardContent className="text-white">
                 <p className="text-lg font-bengali mb-6 opacity-90">
-                  {classData.description}
+                  {selectedClass.description_bn}
                 </p>
                 
                 <div className="grid grid-cols-2 gap-6 mb-8">
@@ -117,10 +135,10 @@ export default function LiveClassPage() {
                     <div>
                       <p className="font-bengali font-medium">তারিখ ও সময়</p>
                       <p className="font-bengali opacity-75">
-                        {classData.scheduledTime.toLocaleDateString('bn-BD')}
+                        {new Date(selectedClass.scheduled_at).toLocaleDateString('bn-BD')}
                       </p>
                       <p className="font-bengali opacity-75">
-                        {classData.scheduledTime.toLocaleTimeString('bn-BD', {
+                        {new Date(selectedClass.scheduled_at).toLocaleTimeString('bn-BD', {
                           hour: '2-digit',
                           minute: '2-digit'
                         })}
@@ -132,7 +150,7 @@ export default function LiveClassPage() {
                     <Clock className="w-6 h-6 opacity-75" />
                     <div>
                       <p className="font-bengali font-medium">সময়কাল</p>
-                      <p className="font-bengali opacity-75">{classData.duration} মিনিট</p>
+                      <p className="font-bengali opacity-75">{selectedClass.duration} মিনিট</p>
                     </div>
                   </div>
                   
@@ -141,7 +159,7 @@ export default function LiveClassPage() {
                     <div>
                       <p className="font-bengali font-medium">অংশগ্রহণকারী</p>
                       <p className="font-bengali opacity-75">
-                        {classData.currentParticipants}/{classData.maxParticipants} জন
+                        {selectedClass.current_participants}/{selectedClass.max_participants} জন
                       </p>
                     </div>
                   </div>
@@ -152,7 +170,7 @@ export default function LiveClassPage() {
                     </div>
                     <div>
                       <p className="font-bengali font-medium">শিক্ষক</p>
-                      <p className="font-bengali opacity-75">{classData.instructor}</p>
+                      <p className="font-bengali opacity-75">{selectedClass.instructors?.name_bn || 'শিক্ষক'}</p>
                     </div>
                   </div>
                 </div>

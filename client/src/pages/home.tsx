@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   BookOpen, 
   Video, 
@@ -15,43 +16,62 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-// Mock data for demonstration
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { getUserProfile, getLiveClasses } from "@/lib/api";
+import { Link } from "wouter";
+import { insertSampleData } from "../utils/insertSampleData";
 
 export default function Home() {
   const { toast } = useToast();
+  const { user, userProfile, loading: authLoading } = useAuth();
 
-  // Mock user data
-  const mockUser = {
-    id: "demo-user-1",
-    first_name: "আহমেদ",
-    last_name: "হাসান"
+  // Fetch real data
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['/api/user-profile', user?.id],
+    queryFn: () => getUserProfile(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const { data: upcomingClasses, isLoading: classesLoading } = useQuery({
+    queryKey: ['/api/live-classes'],
+    queryFn: () => getLiveClasses(),
+  });
+
+  const isLoading = authLoading || profileLoading || classesLoading;
+
+  // Use real data or fallbacks
+  const displayProfile = profile || userProfile || {
+    enrollment_status: "pending",
+    course_progress: 0,
+    classes_attended: 0,
+    certificate_score: 0,
+    first_name: "",
+    last_name: ""
   };
 
-  // Mock upcoming classes
-  const upcomingClasses = [
-    {
-      id: "class-1",
-      title: "Arabic Reading Practice",
-      title_bn: "আরবি পড়ার অনুশীলন",
-      scheduled_at: "2025-01-08T14:00:00Z",
-      course_modules: {
-        title: "Reading Skills",
-        title_bn: "পড়ার দক্ষতা",
-        level: 2
-      },
-      instructors: {
-        name: "Dr. Ahmed",
-        name_bn: "ড. আহমেদ"
-      }
-    }
-  ];
+  const displayUser = user || { 
+    email: "user@example.com",
+    user_metadata: { first_name: "ব্যবহারকারী", last_name: "" }
+  };
 
-  const mockUserProfile = {
-    enrollment_status: "enrolled",
-    first_name: "আহমেদ",
-    course_progress: 65,
-    classes_attended: 12,
-    certificate_score: 85
+  // Insert sample data when button is clicked (for testing)
+  const handleInsertSampleData = async () => {
+    const result = await insertSampleData();
+    if (result.success) {
+      toast({
+        title: "নমুনা ডেটা যোগ করা হয়েছে!",
+        description: "কোর্স, ইন্সট্রাক্টর এবং ক্লাসের তথ্য যোগ করা হয়েছে।",
+      });
+      // Refetch data
+      window.location.reload();
+    } else {
+      toast({
+        title: "ত্রুটি!",
+        description: "ডেটা যোগ করতে সমস্যা হয়েছে।",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -65,18 +85,18 @@ export default function Home() {
             <div className="flex items-center space-x-4 mb-4">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {mockUserProfile?.first_name ? mockUserProfile.first_name.charAt(0) : "ম"}
+                  {displayProfile.first_name ? displayProfile.first_name.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  আসসালামু আলাইকুম, {mockUserProfile?.first_name || "ভাই/বোন"}!
+                  আসসালামু আলাইকুম, {displayProfile.first_name || displayUser.user_metadata?.first_name || "ভাই/বোন"}!
                 </h1>
                 <p className="opacity-90">আপনার আরবি শিক্ষার যাত্রায় স্বাগতম</p>
               </div>
             </div>
             
-            {mockUserProfile?.enrollment_status === "enrolled" ? (
+            {displayProfile.enrollment_status === "enrolled" ? (
               <Badge className="bg-islamic-gold text-dark-green">
                 ✓ কোর্সে নিবন্ধিত
               </Badge>
@@ -94,11 +114,11 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {mockUserProfile?.course_progress || 0}%
+                {displayProfile.course_progress || 0}%
               </div>
               <div className="text-sm text-gray-600">কোর্স সম্পন্ন</div>
               <Progress 
-                value={mockUserProfile?.course_progress || 0} 
+                value={displayProfile.course_progress || 0} 
                 className="mt-2 h-2"
               />
             </CardContent>
@@ -108,7 +128,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {mockUserProfile?.classes_attended || 0}
+                {displayProfile.classes_attended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -118,7 +138,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Award className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {mockUserProfile?.certificate_score || 0}%
+                {displayProfile.certificate_score || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>
