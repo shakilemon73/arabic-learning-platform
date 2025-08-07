@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
+import SupabaseLogin from "@/components/SupabaseLogin";
 
 function Router() {
   const { user, loading, error } = useSupabaseAuth();
@@ -51,7 +52,11 @@ function Router() {
   return (
     <Switch>
       {!isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/login" component={SupabaseLogin} />
+          <Route path="/register" component={SupabaseLogin} />
+        </>
       ) : (
         <>
           <Route path="/" component={Home} />

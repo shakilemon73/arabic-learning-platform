@@ -1,18 +1,12 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import SupabaseLogin from "@/components/SupabaseLogin";
 import { Star, BookOpen, Video, Award, Users, Clock, Shield, CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { Link } from "wouter";
 
 export default function Landing() {
-  const [showLogin, setShowLogin] = useState(false);
-
-  if (showLogin) {
-    return <SupabaseLogin />;
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,22 +54,24 @@ export default function Landing() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
-                size="lg" 
-                className="w-full sm:w-auto px-8 py-4 bg-islamic-gold text-dark-green font-bold rounded-xl hover:bg-yellow-400 transform hover:scale-105 transition-all duration-300 shadow-lg"
-                onClick={() => setShowLogin(true)}
-              >
-                <span className="text-lg">লগইন করুন</span>
-                <span className="block text-sm opacity-80">Live Class Experience</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="w-full sm:w-auto px-8 py-4 border-2 border-white text-white font-medium rounded-xl hover:bg-white hover:text-islamic-green transition-all duration-300"
-                onClick={() => setShowLogin(true)}
-              >
-                নিবন্ধন করুন
-              </Button>
+              <Link href="/login">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto px-8 py-4 bg-islamic-gold text-dark-green font-bold rounded-xl hover:bg-yellow-400 transform hover:scale-105 transition-all duration-300 shadow-lg"
+                >
+                  <span className="text-lg">লগইন করুন</span>
+                  <span className="block text-sm opacity-80">Live Class Experience</span>
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="w-full sm:w-auto px-8 py-4 border-2 border-white text-white font-medium rounded-xl hover:bg-white hover:text-islamic-green transition-all duration-300"
+                >
+                  নিবন্ধন করুন
+                </Button>
+              </Link>
             </div>
 
             {/* Trust Indicators */}
@@ -242,13 +238,14 @@ export default function Landing() {
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
             মাত্র ৬০০ টাকায় সম্পূর্ণ কোর্সে অ্যাক্সেস পান এবং কুরআন ও হাদিস বুঝার দক্ষতা অর্জন করুন।
           </p>
-          <Button 
-            size="lg" 
-            className="px-8 py-4 bg-islamic-green text-white font-semibold text-lg rounded-xl hover:bg-dark-green transition-all duration-300 shadow-lg"
-            onClick={() => setShowLogin(true)}
-          >
-            এখনই নিবন্ধন করুন
-          </Button>
+          <Link href="/register">
+            <Button 
+              size="lg" 
+              className="px-8 py-4 bg-islamic-green text-white font-semibold text-lg rounded-xl hover:bg-dark-green transition-all duration-300 shadow-lg"
+            >
+              এখনই নিবন্ধন করুন
+            </Button>
+          </Link>
         </div>
       </section>
 

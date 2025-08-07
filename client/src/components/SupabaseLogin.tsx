@@ -6,10 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation, Link } from "wouter";
 
 export default function SupabaseLogin() {
   const { signIn, signUp, loading } = useSupabaseAuth();
   const { toast } = useToast();
+  const [location] = useLocation();
+  
+  // Determine default tab based on current route
+  const defaultTab = location === '/register' ? 'signup' : 'signin';
   
   const [signInData, setSignInData] = useState({
     email: "",
@@ -105,11 +110,16 @@ export default function SupabaseLogin() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-soft-mint to-sage-green/20 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-islamic-green to-sage-green rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-3xl font-bold">আরবি</span>
-          </div>
+          <Link href="/">
+            <div className="w-20 h-20 bg-gradient-to-br from-islamic-green to-sage-green rounded-2xl flex items-center justify-center mx-auto mb-4 hover:scale-105 transition-transform cursor-pointer">
+              <span className="text-white text-3xl font-bold">আরবি</span>
+            </div>
+          </Link>
           <h1 className="text-3xl font-bold text-islamic-green mb-2">আরবি শিক্ষা</h1>
           <p className="text-gray-600">কুরআন ও হাদিস বোঝার জন্য আরবি শিখুন</p>
+          <Link href="/" className="text-sm text-islamic-green hover:underline">
+            ← হোমে ফিরে যান
+          </Link>
         </div>
 
         <Card className="shadow-xl">
@@ -120,7 +130,7 @@ export default function SupabaseLogin() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">লগইন</TabsTrigger>
                 <TabsTrigger value="signup">নিবন্ধন</TabsTrigger>
