@@ -5,8 +5,13 @@ console.log("🚀 Starting Arabic Learning Platform with Supabase backend...");
 console.log("📱 Express server removed - Using Vite frontend only");
 console.log("🔄 This application now uses Supabase for authentication and data storage");
 
-// Start Vite dev server
-const viteProcess = exec('npx vite --port 5000 --host 0.0.0.0', (error, stdout, stderr) => {
+// Start Vite dev server with allowedHosts configuration
+const viteProcess = exec('npx vite --port 5000 --host 0.0.0.0 --config vite.config.ts', {
+  env: { 
+    ...process.env, 
+    VITE_ALLOWED_HOSTS: '6692d1bd-0682-4fda-81a4-bbcc258f1606-00-2yi5s6673es4l.spock.replit.dev,*.replit.dev,localhost'
+  }
+}, (error, stdout, stderr) => {
   if (error) {
     console.error(`Vite process error: ${error}`);
     return;

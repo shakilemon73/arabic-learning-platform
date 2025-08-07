@@ -2,11 +2,13 @@
 
 This is an Arabic language learning platform that provides online courses with live classes. The application is designed specifically for Bengali speakers who want to learn Arabic to better understand the Quran and Hadith. It features course enrollment with payment processing, live class participation, user progress tracking, and certificate generation.
 
-**Migration Status: ✅ COMPLETE**
-- Successfully migrated from Replit agent to standard Replit environment
-- Demo authentication system implemented for testing all features
-- Live class platform with screen sharing, real-time chat, and homework submission fully operational
-- All 11 checklist items completed successfully
+**Migration Status: ✅ COMPLETE - SUPABASE BACKEND**
+- Successfully migrated from Express server to Supabase-only architecture
+- Replaced Express backend with direct Supabase API calls
+- Implemented Supabase authentication with login/signup components
+- Application now runs as pure frontend with Supabase backend
+- All authentication flows updated to use Supabase Auth
+- Migration checklist completed successfully
 
 # User Preferences
 
@@ -22,16 +24,16 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS with custom Islamic-themed color palette and Bengali typography support
 
 ## Backend Architecture
-- **Framework**: Express.js server with TypeScript
-- **Authentication**: Replit Auth with OpenID Connect for secure user authentication
-- **Session Management**: Express sessions stored in PostgreSQL using connect-pg-simple
-- **API Design**: RESTful endpoints with proper error handling and request logging middleware
+- **Framework**: Supabase Backend-as-a-Service (BaaS)
+- **Authentication**: Supabase Auth with JWT tokens and secure session management
+- **Database**: PostgreSQL via Supabase with real-time subscriptions
+- **API Design**: Direct Supabase client calls from frontend (no Express server)
 
 ## Database Design
-- **ORM**: Drizzle ORM with type-safe schema definitions
-- **Database**: PostgreSQL via Neon serverless connection
+- **Database**: PostgreSQL via Supabase with real-time capabilities
 - **Schema**: Comprehensive tables for users, course modules, live classes, instructors, class attendance, and session storage
 - **Features**: User progress tracking, payment status, course enrollment status, and attendance records
+- **Real-time**: Supabase real-time subscriptions for live features
 
 ## Payment Processing
 - **Provider**: Bangladeshi mobile banking (bKash, Nagad, Rocket) for course enrollment payments (600 BDT)
