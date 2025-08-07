@@ -48,10 +48,8 @@ export default function SupabaseLogin() {
         title: "সফল!",
         description: "আপনি সফলভাবে লগইন করেছেন",
       });
-      // Redirect to dashboard after successful login
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1000);
+      // Redirect to dashboard immediately after successful login
+      window.location.href = "/dashboard";
     } else {
       toast({
         title: "লগইন ব্যর্থ",

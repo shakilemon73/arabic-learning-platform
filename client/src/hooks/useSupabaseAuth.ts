@@ -14,19 +14,10 @@ export const useSupabaseAuth = () => {
     const getInitialSession = async () => {
       console.log('🔍 Starting authentication check...');
       
-      // Set a timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.log('⏰ Auth check timeout - forcing loading to false');
-        setLoading(false);
-        setError('Authentication timeout - please refresh');
-      }, 8000); // 8 second timeout
-      
       try {
         console.log('📡 Calling getCurrentUser...');
         const { user: currentUser, error: userError } = await getCurrentUser();
         console.log('👤 User result:', currentUser ? 'User found' : 'No user', userError);
-        
-        clearTimeout(timeoutId);
         
         if (userError) {
           console.error('❌ User fetch error:', userError);
@@ -54,7 +45,6 @@ export const useSupabaseAuth = () => {
           console.log('👤 No user found - showing public content');
         }
       } catch (err) {
-        clearTimeout(timeoutId);
         console.error('💥 Critical error during auth check:', err);
         setError('Failed to get user session');
       } finally {

@@ -18,23 +18,7 @@ function Router() {
   const isAuthenticated = !!user;
   const isLoading = loading;
 
-  // If there's an authentication timeout or error, still show all routes
-  if (error && error.includes('timeout')) {
-    console.log('🚨 Auth timeout detected - showing all routes as public');
-    return (
-      <Switch>
-        {/* Authentication routes - always accessible */}
-        <Route path="/login" component={LoginPage} />
-        <Route path="/register" component={RegisterPage} />
-        <Route path="/" component={Landing} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/live-class" component={LiveClass} />
-        <Route path="/course-registration" component={CourseRegistration} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
-
+  // Show simplified loading without timeout issues
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-soft-mint">
@@ -42,16 +26,13 @@ function Router() {
           <div className="w-16 h-16 bg-gradient-to-br from-islamic-green to-sage-green rounded-xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-2xl font-bold">আ</span>
           </div>
-          <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">লোড হচ্ছে...</p>
-          <p className="text-sm text-gray-500 mt-2">Authentication in progress...</p>
-          {error && (
-            <p className="text-red-600 text-sm mt-2">{error}</p>
-          )}
         </div>
       </div>
     );
   }
+
+
 
   return (
     <Switch>
