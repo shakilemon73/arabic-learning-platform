@@ -7,15 +7,6 @@ export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
-    // Disabled cartographer plugin to fix "traverse is not a function" errors
-    // ...(process.env.NODE_ENV !== "production" &&
-    // process.env.REPL_ID !== undefined
-    //   ? [
-    //       await import("@replit/vite-plugin-cartographer").then((m) =>
-    //         m.cartographer(),
-    //       ),
-    //     ]
-    //   : []),
   ],
   resolve: {
     alias: {
@@ -32,7 +23,14 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5000,
-    allowedHosts: "all",
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1", 
+      "*.replit.dev",
+      "*.replit.app",
+      "*.replit.co",
+      "7ae9adfb-5f19-4518-ba2e-cd90a8e8fc72-00-37rpnnco1rqyc.riker.replit.dev"
+    ],
     fs: {
       strict: true,
       deny: ["**/.*"],
