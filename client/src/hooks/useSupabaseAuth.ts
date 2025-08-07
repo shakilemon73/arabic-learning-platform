@@ -94,7 +94,7 @@ export const useSupabaseAuth = () => {
 
       console.log('👤 Profile check result:', existingProfile ? 'Profile exists' : 'No profile', fetchError);
 
-      if (fetchError && fetchError.code === 'PGRST116') {
+      if (fetchError && (fetchError.code === 'PGRST116' || fetchError.code === 'PGRST205')) {
         console.log('🆕 Creating new user profile...');
         // User doesn't exist, create profile
         const { error: insertError } = await supabase
@@ -114,11 +114,19 @@ export const useSupabaseAuth = () => {
 
         if (insertError) {
           console.error('❌ Error creating user profile:', insertError);
+          // If table doesn't exist, just continue without profile
+          if (insertError.code === 'PGRST205') {
+            console.log('📋 Database tables not found - please run database setup');
+          }
         } else {
           console.log('✅ User profile created successfully');
         }
       } else if (fetchError) {
         console.error('❌ Error fetching user profile:', fetchError);
+        // If table doesn't exist, just continue without profile  
+        if (fetchError.code === 'PGRST205') {
+          console.log('📋 Database tables not found - please run database setup');
+        }
       }
     } catch (err) {
       console.error('💥 Exception in ensureUserProfile:', err);
