@@ -94,6 +94,13 @@ export const useSupabaseAuth = () => {
 
       console.log('👤 Profile check result:', existingProfile ? 'Profile exists' : 'No profile', fetchError);
       console.log('🔍 Full error details:', fetchError);
+      
+      if (existingProfile) {
+        console.log('🎓 User enrollment status:', existingProfile.enrollment_status);
+        console.log('💳 User payment status:', existingProfile.payment_status);
+        setUserProfile(existingProfile);
+        return;
+      }
 
       if (fetchError && (fetchError.code === 'PGRST116' || fetchError.code === 'PGRST205' || fetchError.code === 'PGRST301')) {
         console.log('🆕 Creating new user profile...');
