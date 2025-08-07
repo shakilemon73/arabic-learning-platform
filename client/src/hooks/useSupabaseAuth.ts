@@ -20,6 +20,7 @@ export const useSupabaseAuth = () => {
       setUserProfile(profile);
     } catch (err) {
       // Silently continue without profile
+      console.log('Profile load failed:', err);
     }
   };
 
@@ -29,36 +30,65 @@ export const useSupabaseAuth = () => {
     const initAuth = async () => {
       if (!mounted) return;
       
+      console.log('🔍 Initializing authentication...');
+      
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
+        console.log('👤 Current user:', currentUser ? 'Found' : 'Not found');
+        
         if (mounted) {
           setUser(currentUser);
           if (currentUser) {
+            console.log('📋 Loading user profile...');
             await loadUserProfile(currentUser.id);
           }
+          console.log('✅ Auth initialization complete, setting loading to false');
           setLoading(false);
         }
       } catch (err) {
+        console.error('❌ Auth initialization error:', err);
         if (mounted) {
           setLoading(false);
         }
       }
     };
 
-    initAuth();
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.log('⚠️ Auth initialization timeout, forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000); // 5 second timeout
+
+    initAuth().finally(() => {
+      clearTimeout(timeoutId);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
         
+        console.log('🔄 Auth state change:', event, session?.user ? 'User present' : 'No user');
+        
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ User signed in');
           await loadUserProfile(session.user.id);
           setError(null);
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
+          console.log('👋 User signed out');
           setUserProfile(null);
           setError(null);
+          setLoading(false);
+        }
+        
+        // Ensure loading is false after any auth state change
+        if (mounted) {
+          console.log('🔄 Setting loading to false after auth state change');
+          setLoading(false);
         }
       }
     );
