@@ -21,10 +21,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "client/src/**": {
-      "includeFiles": "client/src/**"
-    }
-  }
+  ]
 }
