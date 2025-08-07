@@ -92,18 +92,18 @@ export default function Home() {
             <div className="flex items-center space-x-4 mb-4">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {userProfile?.firstName ? userProfile.firstName.charAt(0) : "ম"}
+                  {userProfile?.first_name ? userProfile.first_name.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  আসসালামু আলাইকুম, {userProfile?.firstName || "ভাই/বোন"}!
+                  আসসালামু আলাইকুম, {userProfile?.first_name || "ভাই/বোন"}!
                 </h1>
                 <p className="opacity-90">আপনার আরবি শিক্ষার যাত্রায় স্বাগতম</p>
               </div>
             </div>
             
-            {userProfile?.enrollmentStatus === "enrolled" ? (
+            {userProfile?.enrollment_status === "enrolled" ? (
               <Badge className="bg-islamic-gold text-dark-green">
                 ✓ কোর্সে নিবন্ধিত
               </Badge>
@@ -121,11 +121,11 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.courseProgress || 0}%
+                {userProfile?.course_progress || 0}%
               </div>
               <div className="text-sm text-gray-600">কোর্স সম্পন্ন</div>
               <Progress 
-                value={userProfile?.courseProgress || 0} 
+                value={userProfile?.course_progress || 0} 
                 className="mt-2 h-2"
               />
             </CardContent>
@@ -135,7 +135,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.classesAttended || 0}
+                {userProfile?.classes_attended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -145,7 +145,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Award className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.certificateScore || 0}%
+                {userProfile?.certificate_score || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>

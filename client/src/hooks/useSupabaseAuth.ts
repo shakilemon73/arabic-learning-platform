@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase, getCurrentUser, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut, getUserProfile } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
-import type { User as DBUser } from '@shared/schema';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as DBUser } from '@/lib/types';
 
 export const useSupabaseAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<DBUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export const useSupabaseAuth = () => {
     };
   }, []);
 
-  const ensureUserProfile = async (authUser: User) => {
+  const ensureUserProfile = async (authUser: SupabaseUser) => {
     try {
       const { data: existingProfile, error: fetchError } = await supabase
         .from('users')

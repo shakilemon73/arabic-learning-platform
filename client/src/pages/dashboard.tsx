@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
 import Header from "@/components/Header";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import type { AttendanceWithClass, CourseModule, LiveClassWithDetails } from "@/lib/types";
 
 export default function Dashboard() {
   const { user, userProfile, loading } = useSupabaseAuth();
@@ -45,7 +46,7 @@ export default function Dashboard() {
   }, [isAuthenticated, isLoading, toast]);
 
   // Get user's attendance using direct Supabase call
-  const { data: attendance = [] } = useQuery({
+  const { data: attendance = [] } = useQuery<AttendanceWithClass[]>({
     queryKey: ["user-attendance", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -67,7 +68,7 @@ export default function Dashboard() {
   });
 
   // Get course modules using direct Supabase call
-  const { data: modules = [] } = useQuery({
+  const { data: modules = [] } = useQuery<CourseModule[]>({
     queryKey: ["course-modules"],
     queryFn: async () => {
       const { data } = await supabase
@@ -120,8 +121,8 @@ export default function Dashboard() {
     return null;
   }
 
-  const enrollmentStatus = userProfile?.enrollmentStatus;
-  const paymentStatus = userProfile?.paymentStatus;
+  const enrollmentStatus = userProfile?.enrollment_status;
+  const paymentStatus = userProfile?.payment_status;
 
   return (
     <div className="min-h-screen bg-background">
@@ -134,12 +135,12 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4 mb-4 md:mb-0">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {userProfile?.firstName ? userProfile.firstName.charAt(0) : "ম"}
+                  {userProfile?.first_name ? userProfile.first_name.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  {userProfile?.firstName || "শিক্ষার্থী"} {userProfile?.lastName || ""}
+                  {userProfile?.first_name || "শিক্ষার্থী"} {userProfile?.last_name || ""}
                 </h1>
                 <p className="opacity-90">শিক্ষার্থী আইডি: #{user?.id?.slice(-5)}</p>
               </div>
@@ -167,11 +168,11 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.courseProgress || 0}%
+                {userProfile?.course_progress || 0}%
               </div>
               <div className="text-sm text-gray-600 mb-3">কোর্স সম্পন্ন</div>
               <Progress 
-                value={userProfile?.courseProgress || 0} 
+                value={userProfile?.course_progress || 0} 
                 className="h-3"
               />
             </CardContent>
@@ -181,7 +182,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.classesAttended || 0}
+                {userProfile?.classes_attended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -191,7 +192,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Award className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.certificateScore || 0}%
+                {userProfile?.certificate_score || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>
@@ -375,7 +376,7 @@ export default function Dashboard() {
                     কোর্স সম্পন্ন করার পর আপনি সার্টিফিকেট ডাউনলোড করতে পারবেন
                   </p>
                   
-                  {(userProfile?.courseProgress || 0) >= 100 ? (
+                  {(userProfile?.course_progress || 0) >= 100 ? (
                     <Button className="bg-islamic-gold text-dark-green hover:bg-yellow-400">
                       <Download className="w-4 h-4 mr-2" />
                       সার্টিফিকেট ডাউনলোড
@@ -383,9 +384,9 @@ export default function Dashboard() {
                   ) : (
                     <div className="bg-soft-mint rounded-lg p-6">
                       <p className="text-gray-700 mb-4">
-                        সার্টিফিকেটের জন্য আরও {100 - (userProfile?.courseProgress || 0)}% কোর্স সম্পন্ন করুন
+                        সার্টিফিকেটের জন্য আরও {100 - (userProfile?.course_progress || 0)}% কোর্স সম্পন্ন করুন
                       </p>
-                      <Progress value={userProfile?.courseProgress || 0} className="h-3" />
+                      <Progress value={userProfile?.course_progress || 0} className="h-3" />
                     </div>
                   )}
                 </div>

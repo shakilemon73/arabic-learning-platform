@@ -1,82 +1,64 @@
-import { createClient } from '@supabase/supabase-js';
+// API utility functions for consistent data fetching
+import { supabase } from '@/lib/supabase';
+import type { 
+  User, 
+  CourseModule, 
+  LiveClass, 
+  ClassAttendance, 
+  PaymentRecord, 
+  HomeworkSubmission,
+  LiveClassWithDetails,
+  AttendanceWithClass
+} from '@/lib/types';
 
-// Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://sgyanvjlwlrzcrpjwlsd.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNneWFudmpsd2xyemNycGp3bHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NTg1MjAsImV4cCI6MjA3MDEzNDUyMH0.5xjMdSUdeHGln68tfuw626q4xDZkuR8Xg_e_w6g9iJk';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
-
-// Auth helper functions
-export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  return { data, error };
-};
-
-export const signUp = async (email: string, password: string, metadata?: Record<string, any>) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: metadata
-    }
-  });
-  return { data, error };
-};
-
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
-};
-
-export const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  return { user, error };
-};
-
-// Database helper functions
-export const getUserProfile = async (userId: string) => {
+// User Profile APIs
+export const getUserProfile = async (userId: string): Promise<User | null> => {
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('id', userId)
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+  return data;
 };
 
-export const updateUserProfile = async (userId: string, updates: any) => {
+export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User | null> => {
   const { data, error } = await supabase
     .from('users')
     .update(updates)
     .eq('id', userId)
     .select()
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error updating user profile:', error);
+    return null;
+  }
+  return data;
 };
 
-export const getCourseModules = async () => {
+// Course Module APIs
+export const getCourseModules = async (): Promise<CourseModule[]> => {
   const { data, error } = await supabase
     .from('course_modules')
     .select('*')
     .eq('is_active', true)
     .order('level', { ascending: true })
     .order('order', { ascending: true });
-  return { data, error };
+  
+  if (error) {
+    console.error('Error fetching course modules:', error);
+    return [];
+  }
+  return data || [];
 };
 
-export const getLiveClasses = async (limit = 10) => {
+// Live Class APIs
+export const getLiveClasses = async (limit = 10): Promise<LiveClassWithDetails[]> => {
   const { data, error } = await supabase
     .from('live_classes')
     .select(`
@@ -95,10 +77,15 @@ export const getLiveClasses = async (limit = 10) => {
     .eq('is_active', true)
     .order('scheduled_at', { ascending: false })
     .limit(limit);
-  return { data, error };
+  
+  if (error) {
+    console.error('Error fetching live classes:', error);
+    return [];
+  }
+  return data || [];
 };
 
-export const getUpcomingClasses = async () => {
+export const getUpcomingClasses = async (): Promise<LiveClassWithDetails[]> => {
   const { data, error } = await supabase
     .from('live_classes')
     .select(`
@@ -117,10 +104,16 @@ export const getUpcomingClasses = async () => {
     .eq('is_active', true)
     .gte('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true });
-  return { data, error };
+  
+  if (error) {
+    console.error('Error fetching upcoming classes:', error);
+    return [];
+  }
+  return data || [];
 };
 
-export const recordAttendance = async (userId: string, classId: string, duration: number) => {
+// Attendance APIs
+export const recordAttendance = async (userId: string, classId: string, duration: number): Promise<ClassAttendance | null> => {
   const { data, error } = await supabase
     .from('class_attendance')
     .insert({
@@ -131,10 +124,15 @@ export const recordAttendance = async (userId: string, classId: string, duration
     })
     .select()
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error recording attendance:', error);
+    return null;
+  }
+  return data;
 };
 
-export const getUserAttendance = async (userId: string) => {
+export const getUserAttendance = async (userId: string): Promise<AttendanceWithClass[]> => {
   const { data, error } = await supabase
     .from('class_attendance')
     .select(`
@@ -147,9 +145,15 @@ export const getUserAttendance = async (userId: string) => {
     `)
     .eq('user_id', userId)
     .order('attended_at', { ascending: false });
-  return { data, error };
+  
+  if (error) {
+    console.error('Error fetching user attendance:', error);
+    return [];
+  }
+  return data || [];
 };
 
+// Payment APIs
 export const createPaymentRecord = async (userId: string, paymentData: {
   payment_id: string;
   payment_ref: string;
@@ -157,7 +161,7 @@ export const createPaymentRecord = async (userId: string, paymentData: {
   method: string;
   status: string;
   phone_number?: string;
-}) => {
+}): Promise<PaymentRecord | null> => {
   const { data, error } = await supabase
     .from('payment_records')
     .insert({
@@ -166,10 +170,15 @@ export const createPaymentRecord = async (userId: string, paymentData: {
     })
     .select()
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error creating payment record:', error);
+    return null;
+  }
+  return data;
 };
 
-export const updatePaymentStatus = async (paymentId: string, status: string, transactionId?: string) => {
+export const updatePaymentStatus = async (paymentId: string, status: string, transactionId?: string): Promise<PaymentRecord | null> => {
   const updateData: any = { 
     status,
     updated_at: new Date().toISOString()
@@ -185,9 +194,15 @@ export const updatePaymentStatus = async (paymentId: string, status: string, tra
     .eq('payment_id', paymentId)
     .select()
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error updating payment status:', error);
+    return null;
+  }
+  return data;
 };
 
+// Homework APIs
 export const createHomeworkSubmission = async (submissionData: {
   user_id: string;
   class_id: string;
@@ -197,11 +212,16 @@ export const createHomeworkSubmission = async (submissionData: {
   file_name?: string;
   file_size?: number;
   status: string;
-}) => {
+}): Promise<HomeworkSubmission | null> => {
   const { data, error } = await supabase
     .from('homework_submissions')
     .insert(submissionData)
     .select()
     .single();
-  return { data, error };
+  
+  if (error) {
+    console.error('Error creating homework submission:', error);
+    return null;
+  }
+  return data;
 };

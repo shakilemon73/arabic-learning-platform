@@ -5,8 +5,8 @@ console.log("🚀 Starting Arabic Learning Platform with Supabase backend...");
 console.log("📱 Express server removed - Using Vite frontend only");
 console.log("🔄 This application now uses Supabase for authentication and data storage");
 
-// Start Vite dev server with dynamic config that handles all Replit hosts
-const viteProcess = exec('npx vite --config vite.dynamic.config.ts --host 0.0.0.0 --port 5000', (error, stdout, stderr) => {
+// Start Vite dev server using the main config
+const viteProcess = exec('npx vite --host 0.0.0.0 --port 5000', (error, stdout, stderr) => {
   if (error) {
     console.error(`Vite process error: ${error}`);
     return;
