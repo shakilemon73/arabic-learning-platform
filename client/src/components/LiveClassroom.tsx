@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { 
   Video, 
   VideoOff, 
@@ -18,17 +17,16 @@ import {
   MessageSquare,
   Upload,
   FileText,
-  Youtube,
-  Share2,
-  Settings,
   Hand,
   Maximize2,
   Minimize2,
   Volume2,
-  VolumeX
+  VolumeX,
+  Phone,
+  PhoneOff,
+  Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { io, type Socket } from 'socket.io-client';
 import HomeworkSubmission from '@/components/HomeworkSubmission';
 import ParticipantsList from '@/components/ParticipantsList';
 import LiveChat from '@/components/LiveChat';
@@ -57,14 +55,19 @@ interface ChatMessage {
   type: 'message' | 'system' | 'homework';
 }
 
+// Extend window to include JitsiMeetExternalAPI
+declare global {
+  interface Window {
+    JitsiMeetExternalAPI: any;
+  }
+}
+
 export default function LiveClassroom({ 
   sessionId, 
   isInstructor, 
   classTitle, 
   userId 
 }: LiveClassroomProps) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -74,557 +77,448 @@ export default function LiveClassroom({
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [hasHandRaised, setHasHandRaised] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
-  const [classStatus, setClassStatus] = useState<'waiting' | 'live' | 'ended'>('waiting');
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const screenShareRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunks = useRef<Blob[]>([]);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
+  const [showHomeworkDialog, setShowHomeworkDialog] = useState(false);
+  const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
+  const [showChatDialog, setShowChatDialog] = useState(false);
+  const [jitsiApi, setJitsiApi] = useState<any>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Socket connection setup
+  // Generate unique room name for the class
+  const roomName = `ArabicClass_${sessionId}_${Date.now()}`;
+  
+  // Mock user name (in real app, get from your user system)
+  const userName = isInstructor ? 'উস্তাদ আহমেদ' : 'শিক্ষার্থী';
+
   useEffect(() => {
-    const newSocket = io('/', { path: '/ws' });
-    setSocket(newSocket);
-
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      newSocket.emit('join-session', { sessionId, userId });
-      toast({
-        title: "সংযুক্ত হয়েছে",
-        description: "লাইভ ক্লাসে সফলভাবে যোগ দিয়েছেন",
-      });
-    });
-
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-      toast({
-        title: "সংযোগ বিচ্ছিন্ন",
-        description: "লাইভ ক্লাস থেকে সংযোগ বিচ্ছিন্ন হয়েছে",
-        variant: "destructive",
-      });
-    });
-
-    newSocket.on('participants-updated', (updatedParticipants: Participant[]) => {
-      setParticipants(updatedParticipants);
-    });
-
-    newSocket.on('new-message', (message: ChatMessage) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    newSocket.on('recording-started', () => {
-      setIsRecording(true);
-      setClassStatus('live');
-    });
-
-    newSocket.on('recording-stopped', ({ youtubeUrl }: { youtubeUrl?: string }) => {
-      setIsRecording(false);
-      if (youtubeUrl) {
-        toast({
-          title: "রেকর্ডিং YouTube এ আপলোড হয়েছে",
-          description: "ক্লাসের রেকর্ডিং স্বয়ংক্রিয়ভাবে YouTube এ আপলোড করা হয়েছে",
-        });
-      }
-    });
-
-    newSocket.on('screen-share-started', () => {
-      setIsScreenSharing(true);
-    });
-
-    newSocket.on('screen-share-stopped', () => {
-      setIsScreenSharing(false);
-    });
-
-    newSocket.on('class-ended', () => {
-      setClassStatus('ended');
-    });
-
+    // Initialize Jitsi Meet when component mounts
+    if (jitsiContainerRef.current && window.JitsiMeetExternalAPI && !jitsiApi) {
+      initializeJitsiMeet();
+    }
+    
     return () => {
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
+      // Cleanup when component unmounts
+      if (jitsiApi) {
+        jitsiApi.dispose();
       }
-      newSocket.disconnect();
     };
-  }, [sessionId, userId]);
+  }, []);
 
-  // Start camera
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+  const initializeJitsiMeet = () => {
+    const domain = 'meet.jit.si';
+    const options = {
+      roomName: roomName,
+      width: '100%',
+      height: 600,
+      parentNode: jitsiContainerRef.current,
+      configOverwrite: {
+        startWithAudioMuted: !isInstructor, // Instructors start with mic on
+        startWithVideoMuted: false,
+        enableWelcomePage: false,
+        enableClosePage: false,
+        prejoinPageEnabled: false,
+        toolbarButtons: [
+          'microphone', 
+          'camera', 
+          'closedcaptions', 
+          'desktop', 
+          'fullscreen',
+          'fodeviceselection', 
+          'hangup', 
+          'profile', 
+          'chat', 
+          'recording',
+          'livestreaming', 
+          'etherpad', 
+          'sharedvideo', 
+          'settings', 
+          'raisehand',
+          'videoquality', 
+          'filmstrip', 
+          'invite', 
+          'feedback', 
+          'stats', 
+          'shortcuts',
+          'tileview', 
+          'videobackgroundblur', 
+          'download', 
+          'help', 
+          'mute-everyone'
+        ],
+        disableDeepLinking: true,
+        disableThirdPartyRequests: true,
+      },
+      interfaceConfigOverwrite: {
+        BRAND_WATERMARK_LINK: '',
+        SHOW_JITSI_WATERMARK: false,
+        SHOW_WATERMARK_FOR_GUESTS: false,
+        DEFAULT_BACKGROUND: '#1a1a1a',
+        TOOLBAR_ALWAYS_VISIBLE: true,
+        LANG_DETECTION: false,
+        DEFAULT_LANGUAGE: 'bn', // Bengali language support
+      },
+      userInfo: {
+        displayName: userName,
+        email: `${userId}@arabiclearning.com`
       }
-      setIsCameraOn(true);
-      setIsMicOn(true);
-      
-      socket?.emit('camera-started', { sessionId, userId });
-    } catch (error) {
-      toast({
-        title: "ক্যামেরা চালু করতে ব্যর্থ",
-        description: "ক্যামেরা অ্যাক্সেস করার অনুমতি প্রয়োজন",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Stop camera
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraOn(false);
-    socket?.emit('camera-stopped', { sessionId, userId });
-  };
-
-  // Start screen sharing
-  const startScreenShare = async () => {
-    if (!isInstructor) {
-      toast({
-        title: "অনুমতি নেই",
-        description: "শুধুমাত্র শিক্ষক স্ক্রিন শেয়ার করতে পারেন",
-        variant: "destructive",
-      });
-      return;
-    }
+    };
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ 
-        video: true,
-        audio: true 
-      });
+      const api = new window.JitsiMeetExternalAPI(domain, options);
+      setJitsiApi(api);
       
-      if (screenShareRef.current) {
-        screenShareRef.current.srcObject = stream;
-      }
-
-      setIsScreenSharing(true);
-      socket?.emit('screen-share-started', { sessionId, userId });
-
-      stream.getVideoTracks()[0].addEventListener('ended', () => {
-        stopScreenShare();
-      });
-
-      toast({
-        title: "স্ক্রিন শেয়ার শুরু",
-        description: "আপনার স্ক্রিন এখন সবার সাথে শেয়ার হচ্ছে",
-      });
-    } catch (error) {
-      toast({
-        title: "স্ক্রিন শেয়ার ব্যর্থ",
-        description: "স্ক্রিন শেয়ার করার অনুমতি প্রয়োজন",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Stop screen sharing
-  const stopScreenShare = () => {
-    if (screenShareRef.current?.srcObject) {
-      const stream = screenShareRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      screenShareRef.current.srcObject = null;
-    }
-    setIsScreenSharing(false);
-    socket?.emit('screen-share-stopped', { sessionId, userId });
-  };
-
-  // Start recording
-  const startRecording = async () => {
-    if (!isInstructor) {
-      toast({
-        title: "অনুমতি নেই",
-        description: "শুধুমাত্র শিক্ষক রেকর্ডিং শুরু করতে পারেন",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ 
-        video: true, 
-        audio: true 
-      });
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-      });
-      
-      mediaRecorderRef.current = mediaRecorder;
-      recordedChunks.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunks.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        uploadRecordingToYouTube();
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingDuration(0);
-      setClassStatus('live');
-
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-
-      socket?.emit('recording-started', { sessionId });
-
-      toast({
-        title: "রেকর্ডিং শুরু",
-        description: "ক্লাসের রেকর্ডিং শুরু হয়েছে",
-      });
-    } catch (error) {
-      toast({
-        title: "রেকর্ডিং ব্যর্থ",
-        description: "রেকর্ডিং শুরু করতে ব্যর্থ হয়েছে",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Stop recording
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-
-      socket?.emit('recording-stopped', { sessionId });
-    }
-  };
-
-  // Upload to YouTube (simplified - would need actual YouTube API integration)
-  const uploadRecordingToYouTube = async () => {
-    try {
-      const recordedBlob = new Blob(recordedChunks.current, { 
-        type: 'video/webm' 
-      });
-
-      const formData = new FormData();
-      formData.append('video', recordedBlob, `class-${sessionId}-${Date.now()}.webm`);
-      formData.append('sessionId', sessionId);
-      formData.append('title', classTitle);
-
-      const response = await fetch('/api/upload-to-youtube', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
+      // Event listeners for Jitsi Meet
+      api.addEventListener('ready', () => {
+        console.log('Jitsi Meet API ready');
+        setIsConnected(true);
         toast({
-          title: "YouTube আপলোড সফল",
-          description: `ভিডিও লিঙ্ক: ${result.youtubeUrl}`,
+          title: "ক্লাসে যোগ দিয়েছেন",
+          description: "লাইভ ক্লাস শুরু হয়েছে",
         });
-        socket?.emit('recording-uploaded', { 
-          sessionId, 
-          youtubeUrl: result.youtubeUrl 
+        
+        // Set initial participant
+        setParticipants([{
+          id: userId,
+          name: userName,
+          isInstructor: isInstructor,
+          isActive: true,
+          hasHandRaised: false
+        }]);
+      });
+
+      api.addEventListener('participantJoined', (participant: any) => {
+        console.log('Participant joined:', participant);
+        setParticipants(prev => [...prev, {
+          id: participant.id,
+          name: participant.displayName || 'অতিথি',
+          isInstructor: false,
+          isActive: true,
+          hasHandRaised: false
+        }]);
+        
+        toast({
+          title: "নতুন অংশগ্রহণকারী",
+          description: `${participant.displayName || 'অতিথি'} ক্লাসে যোগ দিয়েছেন`,
         });
-      }
+      });
+
+      api.addEventListener('participantLeft', (participant: any) => {
+        console.log('Participant left:', participant);
+        setParticipants(prev => prev.filter(p => p.id !== participant.id));
+        
+        toast({
+          title: "অংশগ্রহণকারী চলে গেছেন",
+          description: `${participant.displayName || 'অতিথি'} ক্লাস ছেড়েছেন`,
+        });
+      });
+
+      api.addEventListener('audioMuteStatusChanged', (data: any) => {
+        setIsMicOn(!data.muted);
+      });
+
+      api.addEventListener('videoMuteStatusChanged', (data: any) => {
+        setIsCameraOn(!data.muted);
+      });
+
+      api.addEventListener('screenSharingStatusChanged', (data: any) => {
+        setIsScreenSharing(data.on);
+      });
+
+      api.addEventListener('recordingStatusChanged', (data: any) => {
+        setIsRecording(data.on);
+      });
+
+      api.addEventListener('raiseHandUpdated', (data: any) => {
+        setHasHandRaised(data.handRaised);
+      });
+
     } catch (error) {
+      console.error('Error initializing Jitsi Meet:', error);
       toast({
-        title: "YouTube আপলোড ব্যর্থ",
-        description: "ভিডিও আপলোড করতে সমস্যা হয়েছে",
+        title: "ক্লাসে যোগ দিতে সমস্যা",
+        description: "পুনরায় চেষ্টা করুন",
         variant: "destructive",
       });
     }
   };
 
-  // Raise/lower hand
-  const toggleHand = () => {
-    setHasHandRaised(!hasHandRaised);
-    socket?.emit('hand-toggled', { sessionId, userId, raised: !hasHandRaised });
-  };
-
-  // End class (instructor only)
-  const endClass = () => {
-    if (isInstructor) {
-      if (isRecording) {
-        stopRecording();
-      }
-      if (isScreenSharing) {
-        stopScreenShare();
-      }
-      socket?.emit('class-ended', { sessionId });
-      setClassStatus('ended');
+  const toggleCamera = () => {
+    if (jitsiApi) {
+      jitsiApi.executeCommand('toggleVideo');
     }
   };
 
-  // Format recording duration
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const toggleMicrophone = () => {
+    if (jitsiApi) {
+      jitsiApi.executeCommand('toggleAudio');
+    }
+  };
+
+  const toggleScreenShare = () => {
+    if (jitsiApi) {
+      if (isScreenSharing) {
+        jitsiApi.executeCommand('toggleShareScreen');
+      } else {
+        jitsiApi.executeCommand('toggleShareScreen');
+      }
+    }
+  };
+
+  const toggleRecording = () => {
+    if (jitsiApi && isInstructor) {
+      jitsiApi.executeCommand('toggleRecording');
+    }
+  };
+
+  const raiseHand = () => {
+    if (jitsiApi) {
+      jitsiApi.executeCommand('toggleRaiseHand');
+    }
+  };
+
+  const leaveClass = () => {
+    if (jitsiApi) {
+      jitsiApi.dispose();
+      setJitsiApi(null);
+      setIsConnected(false);
+      window.location.href = '/dashboard';
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (jitsiApi) {
+      jitsiApi.executeCommand('toggleFullScreen');
+      setIsFullscreen(!isFullscreen);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-soft-mint via-white to-cream">
+    <div className="min-h-screen bg-gradient-to-br from-islamic-green/10 via-white to-sage-green/5">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <Badge 
-                  variant={classStatus === 'live' ? 'destructive' : 'secondary'}
-                  className="live-indicator"
-                >
-                  {classStatus === 'live' ? 'LIVE' : classStatus === 'waiting' ? 'অপেক্ষমাণ' : 'সমাপ্ত'}
-                </Badge>
-              </div>
-              <h1 className="text-headline font-bengali">{classTitle}</h1>
-            </div>
-            
+      <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="flex items-center space-x-1">
-                <Users className="w-4 h-4" />
-                <span>{participants.length}</span>
-              </Badge>
-              {isRecording && (
-                <Badge variant="destructive" className="animate-pulse">
-                  <Circle className="w-3 h-3 mr-1 fill-current" />
-                  REC {formatDuration(recordingDuration)}
-                </Badge>
-              )}
+              <div className="w-8 h-8 bg-gradient-to-br from-islamic-green to-sage-green rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">আ</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">{classTitle}</h1>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={isConnected ? "default" : "secondary"} className="text-xs">
+                    {isConnected ? "✅ সংযুক্ত" : "⏳ যোগ দিচ্ছে..."}
+                  </Badge>
+                  {isRecording && (
+                    <Badge variant="destructive" className="text-xs animate-pulse">
+                      <Circle className="w-2 h-2 mr-1 fill-current" />
+                      রেকর্ডিং
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowParticipantsDialog(true)}
+            >
+              <Users className="w-4 h-4 mr-1" />
+              {participants.length}
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowChatDialog(true)}
+            >
+              <MessageSquare className="w-4 h-4 mr-1" />
+              চ্যাট
+            </Button>
+            
+            {isInstructor && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHomeworkDialog(true)}
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                হোমওয়ার্ক
+              </Button>
+            )}
+            
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={leaveClass}
+            >
+              <PhoneOff className="w-4 h-4 mr-1" />
+              ছেড়ে দিন
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Video Area */}
-          <div className="lg:col-span-3">
-            <Card className="bento-card h-[600px] relative overflow-hidden">
-              <CardContent className="p-0 h-full">
-                {isScreenSharing ? (
-                  <video
-                    ref={screenShareRef}
-                    autoPlay
-                    muted
-                    className="w-full h-full object-contain bg-black"
-                    data-testid="screen-share-video"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-islamic-green/10 to-sage-green/10">
-                    <div className="text-center animate-fade-in-up">
-                      <div className="w-24 h-24 bg-islamic-green/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Video className="w-12 h-12 text-islamic-green" />
-                      </div>
-                      <h3 className="text-subtitle font-bengali mb-2">
-                        {isInstructor ? 'স্ক্রিন শেয়ার শুরু করুন' : 'শিক্ষকের স্ক্রিন শেয়ারের জন্য অপেক্ষা করুন'}
-                      </h3>
-                      <p className="text-muted-foreground font-bengali">
-                        {isInstructor ? 'নিচের বাটন ব্যবহার করে স্ক্রিন শেয়ার করুন' : 'শিক্ষক শীঘ্রই পাঠ শুরু করবেন'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Instructor Camera Overlay */}
-                {isCameraOn && (
-                  <div className="absolute bottom-4 right-4 w-48 h-36">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
-                      data-testid="instructor-camera"
-                    />
-                  </div>
-                )}
-
-                {/* Controls Overlay */}
-                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-                  <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-sm rounded-full p-2">
-                    <Button
-                      size="sm"
-                      variant={isCameraOn ? "default" : "secondary"}
-                      onClick={isCameraOn ? stopCamera : startCamera}
-                      className="btn-kinetic"
-                      data-testid="camera-toggle"
-                    >
-                      {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant={isMicOn ? "default" : "secondary"}
-                      onClick={() => setIsMicOn(!isMicOn)}
-                      className="btn-kinetic"
-                      data-testid="mic-toggle"
-                    >
-                      {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant={isSpeakerOn ? "default" : "secondary"}
-                      onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-                      className="btn-kinetic"
-                      data-testid="speaker-toggle"
-                    >
-                      {isSpeakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                    </Button>
-
-                    {isInstructor && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant={isScreenSharing ? "destructive" : "default"}
-                          onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                          className="btn-kinetic"
-                          data-testid="screen-share-toggle"
-                        >
-                          {isScreenSharing ? <MonitorStop className="w-4 h-4" /> : <MonitorUp className="w-4 h-4" />}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant={isRecording ? "destructive" : "default"}
-                          onClick={isRecording ? stopRecording : startRecording}
-                          className="btn-kinetic"
-                          data-testid="recording-toggle"
-                        >
-                          {isRecording ? <Square className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                        </Button>
-                      </>
-                    )}
-
-                    {!isInstructor && (
-                      <Button
-                        size="sm"
-                        variant={hasHandRaised ? "destructive" : "secondary"}
-                        onClick={toggleHand}
-                        className="btn-kinetic"
-                        data-testid="raise-hand"
-                      >
-                        <Hand className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Tabs defaultValue="participants" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="participants" data-testid="participants-tab">
-                  <Users className="w-4 h-4 mr-1" />
-                  অংশগ্রহণকারী
-                </TabsTrigger>
-                <TabsTrigger value="chat" data-testid="chat-tab">
-                  <MessageSquare className="w-4 h-4 mr-1" />
-                  চ্যাট
-                </TabsTrigger>
-                <TabsTrigger value="homework" data-testid="homework-tab">
-                  <FileText className="w-4 h-4 mr-1" />
-                  হোমওয়ার্ক
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="participants" className="mt-4">
-                <ParticipantsList participants={participants} />
-              </TabsContent>
-
-              <TabsContent value="chat" className="mt-4">
-                <LiveChat 
-                  messages={messages}
-                  sessionId={sessionId}
-                  userId={userId}
-                  socket={socket}
-                />
-              </TabsContent>
-
-              <TabsContent value="homework" className="mt-4">
-                <div className="space-y-4">
-                  <Button 
-                    onClick={() => setIsHomeworkDialogOpen(true)}
-                    className="w-full btn-kinetic"
-                    data-testid="submit-homework"
+      {/* Main Video Container */}
+      <div className="flex-1 p-6">
+        <div className="max-w-6xl mx-auto">
+          <Card>
+            <CardContent className="p-0">
+              {/* Jitsi Meet Video Container */}
+              <div 
+                ref={jitsiContainerRef} 
+                className="w-full bg-gray-900 rounded-t-lg overflow-hidden"
+                style={{ minHeight: '600px' }}
+              />
+              
+              {/* Custom Controls */}
+              <div className="bg-gray-50 p-4 rounded-b-lg">
+                <div className="flex items-center justify-center space-x-4">
+                  <Button
+                    variant={isMicOn ? "default" : "secondary"}
+                    size="sm"
+                    onClick={toggleMicrophone}
+                    className={isMicOn ? "bg-islamic-green hover:bg-islamic-green/90" : ""}
                   >
-                    <Upload className="w-4 h-4 mr-2" />
-                    হোমওয়ার্ক জমা দিন
+                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                  </Button>
+                  
+                  <Button
+                    variant={isCameraOn ? "default" : "secondary"}
+                    size="sm"
+                    onClick={toggleCamera}
+                    className={isCameraOn ? "bg-islamic-green hover:bg-islamic-green/90" : ""}
+                  >
+                    {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                  </Button>
+                  
+                  <Button
+                    variant={isScreenSharing ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleScreenShare}
+                  >
+                    {isScreenSharing ? <MonitorStop className="w-4 h-4" /> : <MonitorUp className="w-4 h-4" />}
                   </Button>
                   
                   {isInstructor && (
-                    <Button 
-                      variant="outline"
-                      className="w-full"
-                      data-testid="view-submissions"
+                    <Button
+                      variant={isRecording ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={toggleRecording}
                     >
-                      <FileText className="w-4 h-4 mr-2" />
-                      জমা দেওয়া কাজ দেখুন
+                      {isRecording ? <Square className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                     </Button>
                   )}
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Class Controls for Instructor */}
-            {isInstructor && classStatus === 'live' && (
-              <Card className="bento-card">
-                <CardHeader>
-                  <CardTitle className="font-bengali">ক্লাস নিয়ন্ত্রণ</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button 
-                    variant="destructive" 
-                    className="w-full"
-                    onClick={endClass}
-                    data-testid="end-class"
+                  
+                  <Button
+                    variant={hasHandRaised ? "default" : "outline"}
+                    size="sm"
+                    onClick={raiseHand}
+                    className={hasHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : ""}
                   >
-                    ক্লাস সমাপ্ত করুন
+                    <Hand className="w-4 h-4" />
                   </Button>
                   
-                  <div className="text-sm text-muted-foreground font-bengali">
-                    <p>রেকর্ডিং: {isRecording ? 'চালু' : 'বন্ধ'}</p>
-                    <p>স্ক্রিন শেয়ার: {isScreenSharing ? 'চালু' : 'বন্ধ'}</p>
-                    <p>অংশগ্রহণকারী: {participants.length} জন</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleFullscreen}
+                  >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Class Information */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <FileText className="w-4 h-4 mr-2" />
+                  ক্লাসের তথ্য
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-sm">শিক্ষক: {isInstructor ? userName : 'উস্তাদ আহমেদ'}</p>
+                <p className="text-sm">অংশগ্রহণকারী: {participants.length} জন</p>
+                <p className="text-sm">সময়: {new Date().toLocaleTimeString('bn-BD')}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">ক্লাসের নিয়মাবলী</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-xs text-gray-600">
+                <p>• প্রশ্ন করার আগে হাত তুলুন</p>
+                <p>• মাইক বন্ধ রাখুন যখন কথা বলছেন না</p>
+                <p>• চ্যাটে শুধু ক্লাস সংক্রান্ত আলোচনা করুন</p>
+                <p>• সবার প্রতি সম্মান প্রদর্শন করুন</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">আজকের পাঠ</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-xs text-gray-600">
+                <p>• আরবি বর্ণমালা পরিচয়</p>
+                <p>• উচ্চারণ অনুশীলন</p>
+                <p>• সাধারণ শব্দভাণ্ডার</p>
+                <p>• দোয়া ও তসবিহ</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
 
-      {/* Homework Submission Dialog */}
-      <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Dialogs */}
+      <Dialog open={showParticipantsDialog} onOpenChange={setShowParticipantsDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-bengali">হোমওয়ার্ক জমা দিন</DialogTitle>
+            <DialogTitle>অংশগ্রহণকারী ({participants.length})</DialogTitle>
           </DialogHeader>
-          <HomeworkSubmission 
-            sessionId={sessionId}
-            userId={userId}
-            onClose={() => setIsHomeworkDialogOpen(false)}
+          <ParticipantsList participants={participants} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showChatDialog} onOpenChange={setShowChatDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>লাইভ চ্যাট</DialogTitle>
+          </DialogHeader>
+          <LiveChat 
+            messages={messages} 
+            onSendMessage={(message) => {
+              const newMessage: ChatMessage = {
+                id: Date.now().toString(),
+                userId: userId,
+                userName: userName,
+                message: message,
+                timestamp: new Date(),
+                type: 'message'
+              };
+              setMessages(prev => [...prev, newMessage]);
+            }}
           />
         </DialogContent>
       </Dialog>
+
+      {isInstructor && (
+        <Dialog open={showHomeworkDialog} onOpenChange={setShowHomeworkDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>হোমওয়ার্ক ব্যবস্থাপনা</DialogTitle>
+            </DialogHeader>
+            <HomeworkSubmission sessionId={sessionId} />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
