@@ -1,397 +1,299 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Video, 
-  Mic, 
-  MicOff, 
-  VideoOff, 
-  Users, 
-  MessageCircle,
-  Settings,
-  Phone,
-  PhoneOff,
-  Clock,
-  AlertCircle
-} from "lucide-react";
-import Header from "@/components/Header";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Calendar, Clock, Users, Play, Pause } from 'lucide-react';
+import LiveClassroom from '@/components/LiveClassroom';
+import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
 
-export default function LiveClass() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-  const { toast } = useToast();
-  const [isInCall, setIsInCall] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [selectedClass, setSelectedClass] = useState<any>(null);
+export default function LiveClassPage() {
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const [isClassActive, setIsClassActive] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "অননুমোদিত প্রবেশ",
-        description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
-  // Get upcoming classes
-  const { data: upcomingClasses, isLoading: classesLoading } = useQuery({
-    queryKey: ["/api/upcoming-classes"],
-    enabled: isAuthenticated,
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "অননুমোদিত",
-          description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-    },
-  });
-
-  // Record attendance mutation
-  const attendanceMutation = useMutation({
-    mutationFn: async ({ classId, duration }: { classId: string; duration: number }) => {
-      const response = await apiRequest("POST", "/api/attendance", { classId, duration });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-attendance"] });
-      toast({
-        title: "উপস্থিতি রেকর্ড হয়েছে",
-        description: "আপনার ক্লাসে উপস্থিতি সফলভাবে রেকর্ড হয়েছে।",
-      });
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "অননুমোদিত",
-          description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "উপস্থিতি রেকর্ড ব্যর্থ",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const joinClass = (classItem: any) => {
-    if (user?.enrollmentStatus !== "enrolled") {
-      toast({
-        title: "নিবন্ধন প্রয়োজন",
-        description: "লাইভ ক্লাসে যোগ দিতে প্রথমে কোর্সে নিবন্ধন করুন।",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedClass(classItem);
-    setIsInCall(true);
-    
-    // Record attendance (assuming 90 minutes class duration)
-    attendanceMutation.mutate({
-      classId: classItem.id,
-      duration: 90
-    });
-
-    // In a real implementation, you would integrate with a video calling service
-    // For now, we'll simulate the call interface
-    toast({
-      title: "ক্লাসে যোগ দিয়েছেন",
-      description: `${classItem.titleBn || classItem.title} ক্লাসে আপনাকে স্বাগতম!`,
-    });
+  // Mock data for demonstration - in real app, this would come from URL params or query
+  const classData = {
+    id: 'class-123',
+    title: 'আরবি ব্যাকরণ - প্রাথমিক স্তর',
+    description: 'আরবি ব্যাকরণের মৌলিক বিষয়গুলো নিয়ে আলোচনা',
+    instructor: 'উস্তাদ আহমেদ হাসান',
+    scheduledTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+    duration: 90,
+    maxParticipants: 30,
+    currentParticipants: 12,
   };
 
-  const leaveClass = () => {
-    setIsInCall(false);
-    setSelectedClass(null);
-    setIsMuted(false);
-    setIsVideoOff(false);
-    
-    toast({
-      title: "ক্লাস ছেড়েছেন",
-      description: "আপনি সফলভাবে ক্লাস ছেড়েছেন।",
-    });
+  const { data: upcomingClasses, isLoading } = useQuery({
+    queryKey: ['/api/upcoming-classes'],
+  });
+
+  const isInstructor = user?.email === 'instructor@example.com'; // Mock check
+
+  const handleJoinClass = async () => {
+    try {
+      // Create a live session
+      const response = await fetch('/api/live-sessions/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          classId: classData.id,
+        }),
+      });
+
+      if (response.ok) {
+        const session = await response.json();
+        setSessionId(session.id);
+        setIsClassActive(true);
+      } else {
+        console.error('Failed to create session');
+      }
+    } catch (error) {
+      console.error('Error joining class:', error);
+    }
   };
 
-  if (isLoading) {
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-gradient-to-br from-soft-mint via-white to-cream">
+        <div className="max-w-2xl mx-auto py-20">
+          <Card className="bento-card text-center">
+            <CardContent className="p-8">
+              <h2 className="text-headline font-bengali mb-4">
+                লগইন প্রয়োজন
+              </h2>
+              <p className="text-muted-foreground font-bengali mb-6">
+                লাইভ ক্লাসে অংশগ্রহণের জন্য প্রথমে লগইন করুন
+              </p>
+              <Button onClick={() => navigate('/login')} className="btn-kinetic">
+                লগইন করুন
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (isClassActive && sessionId) {
+    return (
+      <LiveClassroom
+        sessionId={sessionId}
+        isInstructor={isInstructor}
+        classTitle={classData.title}
+        userId={user.id}
+      />
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!isInCall ? (
-          // Class List View
-          <>
-            <div className="text-center mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">লাইভ ক্লাস</h1>
-              <p className="text-lg text-gray-600">আসন্ন এবং চলমান ক্লাস সমূহে যোগ দিন</p>
+    <div className="min-h-screen bg-gradient-to-br from-soft-mint via-white to-cream">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center space-x-2"
+                data-testid="back-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="font-bengali">ড্যাশবোর্ডে ফিরুন</span>
+              </Button>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {user?.enrollmentStatus !== "enrolled" && (
-              <Card className="mb-8 border-orange-200 bg-orange-50">
-                <CardContent className="p-6">
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Class Info */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="bento-card-featured animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-headline font-bengali text-white">
+                    {classData.title}
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-sm">
+                    লাইভ ক্লাস
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="text-white">
+                <p className="text-lg font-bengali mb-6 opacity-90">
+                  {classData.description}
+                </p>
+                
+                <div className="grid grid-cols-2 gap-6 mb-8">
                   <div className="flex items-center space-x-3">
-                    <AlertCircle className="w-6 h-6 text-orange-600" />
+                    <Calendar className="w-6 h-6 opacity-75" />
                     <div>
-                      <h3 className="font-semibold text-orange-800">নিবন্ধন প্রয়োজন</h3>
-                      <p className="text-orange-700">লাইভ ক্লাসে যোগ দিতে প্রথমে কোর্সে নিবন্ধন করুন।</p>
+                      <p className="font-bengali font-medium">তারিখ ও সময়</p>
+                      <p className="font-bengali opacity-75">
+                        {classData.scheduledTime.toLocaleDateString('bn-BD')}
+                      </p>
+                      <p className="font-bengali opacity-75">
+                        {classData.scheduledTime.toLocaleTimeString('bn-BD', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
                     </div>
                   </div>
-                  <Button 
-                    className="mt-4 bg-orange-600 hover:bg-orange-700"
-                    onClick={() => window.location.href = "/course-registration"}
-                  >
-                    এখনই নিবন্ধন করুন
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {classesLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2, 3, 4].map((i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="p-6">
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : upcomingClasses && upcomingClasses.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {upcomingClasses.map((classItem: any) => {
-                  const classDate = new Date(classItem.scheduledAt);
-                  const isLive = Math.abs(Date.now() - classDate.getTime()) < 30 * 60 * 1000; // Within 30 minutes
                   
-                  return (
-                    <Card key={classItem.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">
-                            {classItem.titleBn || classItem.title}
-                          </CardTitle>
-                          {isLive && (
-                            <Badge className="bg-red-500 text-white animate-pulse">
-                              ● লাইভ
-                            </Badge>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-gray-600 mb-4">
-                          {classItem.descriptionBn || classItem.description}
-                        </p>
-                        
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Clock className="w-4 h-4 mr-2" />
-                            {classDate.toLocaleDateString('bn-BD', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Users className="w-4 h-4 mr-2" />
-                            ৯০ মিনিট
-                          </div>
-                        </div>
-
-                        <Button 
-                          className="w-full bg-islamic-green hover:bg-dark-green"
-                          disabled={user?.enrollmentStatus !== "enrolled"}
-                          onClick={() => joinClass(classItem)}
-                        >
-                          <Video className="w-4 h-4 mr-2" />
-                          ক্লাসে যোগ দিন
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Video className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">কোনো আসন্ন ক্লাস নেই</h3>
-                  <p className="text-gray-500">শীঘ্রই নতুন ক্লাসের সময়সূচী ঘোষণা করা হবে।</p>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        ) : (
-          // Video Call Interface
-          <div className="space-y-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {selectedClass?.titleBn || selectedClass?.title}
-              </h1>
-              <Badge className="bg-green-500 text-white">
-                ● লাইভ ক্লাসে যুক্ত
-              </Badge>
-            </div>
-
-            {/* Video Area */}
-            <Card>
-              <CardContent className="p-0">
-                <div className="aspect-video bg-gray-900 rounded-lg flex items-center justify-center text-white relative">
-                  <div className="text-center">
-                    <Video className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">ভিডিও কল সংযুক্ত</p>
-                    <p className="text-sm opacity-75">প্রকৃত বাস্তবায়নে এখানে ভিডিও স্ট্রিম থাকবে</p>
-                  </div>
-                  
-                  {/* User controls overlay */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex items-center space-x-4 bg-black bg-opacity-50 rounded-full px-6 py-3">
-                      <Button
-                        size="sm"
-                        variant={isMuted ? "destructive" : "secondary"}
-                        className="rounded-full w-10 h-10 p-0"
-                        onClick={() => setIsMuted(!isMuted)}
-                      >
-                        {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      </Button>
-                      
-                      <Button
-                        size="sm"
-                        variant={isVideoOff ? "destructive" : "secondary"}
-                        className="rounded-full w-10 h-10 p-0"
-                        onClick={() => setIsVideoOff(!isVideoOff)}
-                      >
-                        {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                      </Button>
-                      
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="rounded-full w-10 h-10 p-0"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </Button>
-                      
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="rounded-full w-10 h-10 p-0"
-                        onClick={leaveClass}
-                      >
-                        <PhoneOff className="w-4 h-4" />
-                      </Button>
+                  <div className="flex items-center space-x-3">
+                    <Clock className="w-6 h-6 opacity-75" />
+                    <div>
+                      <p className="font-bengali font-medium">সময়কাল</p>
+                      <p className="font-bengali opacity-75">{classData.duration} মিনিট</p>
                     </div>
                   </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <Users className="w-6 h-6 opacity-75" />
+                    <div>
+                      <p className="font-bengali font-medium">অংশগ্রহণকারী</p>
+                      <p className="font-bengali opacity-75">
+                        {classData.currentParticipants}/{classData.maxParticipants} জন
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-bold">শি</span>
+                    </div>
+                    <div>
+                      <p className="font-bengali font-medium">শিক্ষক</p>
+                      <p className="font-bengali opacity-75">{classData.instructor}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-4">
+                  {isInstructor ? (
+                    <Button
+                      onClick={handleJoinClass}
+                      className="flex-1 bg-white text-islamic-green hover:bg-gray-100 btn-kinetic"
+                      size="lg"
+                      data-testid="start-class"
+                    >
+                      <Play className="w-5 h-5 mr-2" />
+                      ক্লাস শুরু করুন
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleJoinClass}
+                      className="flex-1 bg-white text-islamic-green hover:bg-gray-100 btn-kinetic"
+                      size="lg"
+                      data-testid="join-class"
+                    >
+                      <Users className="w-5 h-5 mr-2" />
+                      ক্লাসে যোগ দিন
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Class Info and Chat */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>ক্লাসের তথ্য</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="font-medium text-gray-900">আজকের পাঠ</h4>
-                        <p className="text-gray-600">
-                          {selectedClass?.descriptionBn || selectedClass?.description || "আরবি ব্যাকরণের মূলনীতি এবং কুরআনের শব্দভান্ডার"}
-                        </p>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="flex items-center text-sm text-gray-500 mb-1">
-                            <Clock className="w-4 h-4 mr-2" />
-                            সময়কাল
-                          </div>
-                          <p className="font-medium">৯০ মিনিট</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center text-sm text-gray-500 mb-1">
-                            <Users className="w-4 h-4 mr-2" />
-                            অংশগ্রহণকারী
-                          </div>
-                          <p className="font-medium">২৫ জন</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      চ্যাট
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 bg-gray-50 rounded-lg p-4 mb-4 overflow-y-auto">
-                      <div className="text-center text-gray-500 text-sm">
-                        চ্যাট বৈশিষ্ট্য শীঘ্রই আসছে...
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <input 
-                        type="text" 
-                        placeholder="বার্তা লিখুন..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        disabled
-                      />
-                      <Button size="sm" disabled>
-                        পাঠান
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+            {/* Pre-class Information */}
+            <Card className="bento-card animate-fade-in-up animation-delay-200">
+              <CardHeader>
+                <CardTitle className="font-bengali">ক্লাসের আগে জানুন</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 font-bengali">
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-islamic-green/20 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="w-2 h-2 bg-islamic-green rounded-full"></span>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">ক্যামেরা ও মাইক্রোফোন</p>
+                    <p className="text-sm text-muted-foreground">
+                      ক্লাসে সক্রিয় অংশগ্রহণের জন্য ক্যামেরা ও মাইক্রোফোন চালু রাখুন
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-islamic-green/20 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="w-2 h-2 bg-islamic-green rounded-full"></span>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">ইন্টারনেট সংযোগ</p>
+                    <p className="text-sm text-muted-foreground">
+                      ভালো মানের ভিডিও কলের জন্য স্থিতিশীল ইন্টারনেট সংযোগ প্রয়োজন
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-islamic-green/20 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="w-2 h-2 bg-islamic-green rounded-full"></span>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">নোটবুক প্রস্তুত রাখুন</p>
+                    <p className="text-sm text-muted-foreground">
+                      গুরুত্বপূর্ণ পয়েন্টগুলো লিখে রাখার জন্য কলম-খাতা প্রস্তুত রাখুন
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <Card className="bento-card animate-fade-in-up animation-delay-400">
+              <CardHeader>
+                <CardTitle className="font-bengali">দ্রুত তথ্য</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-islamic-green/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="w-8 h-8 text-islamic-green" />
+                  </div>
+                  <p className="font-bengali text-sm text-muted-foreground">
+                    ক্লাস শুরু হবে
+                  </p>
+                  <p className="font-bengali font-semibold text-lg">
+                    5 মিনিট পরে
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bento-card animate-fade-in-up animation-delay-600">
+              <CardHeader>
+                <CardTitle className="font-bengali">ক্লাসের বিষয়বস্তু</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 font-bengali text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-islamic-green rounded-full"></div>
+                  <span>আরবি হরফের পরিচয়</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-islamic-green rounded-full"></div>
+                  <span>হরফের উচ্চারণ</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-islamic-green rounded-full"></div>
+                  <span>সাধারণ শব্দগঠন</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-islamic-green rounded-full"></div>
+                  <span>অনুশীলনী ও প্রশ্নোত্তর</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,16 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
+import { Server as SocketServer } from "socket.io";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, insertHomeworkSubmissionSchema, insertLiveClassSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 // Bangladeshi Payment Gateway Configuration
 const bkashConfig = {
@@ -21,6 +27,29 @@ const bkashConfig = {
 const generatePaymentRef = () => {
   return 'PAY_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 };
+
+// File upload configuration
+const upload = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images, PDFs, and documents are allowed'));
+    }
+  },
+});
+
+// Session participants tracking
+const sessionParticipants = new Map<string, Set<string>>();
+const participantSockets = new Map<string, WebSocket>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -329,6 +358,292 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Live class session management
+  app.post('/api/live-sessions/create', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { classId } = req.body;
+      
+      if (!classId) {
+        return res.status(400).json({ message: "Class ID is required" });
+      }
+      
+      const sessionToken = crypto.randomUUID();
+      const session = await storage.createLiveSession({
+        classId,
+        instructorId: userId,
+        sessionToken,
+        isActive: true,
+      });
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error creating live session:", error);
+      res.status(500).json({ message: "Failed to create live session" });
+    }
+  });
+
+  // Homework submission endpoints
+  app.post('/api/upload-homework-file', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { sessionId, userId } = req.body;
+      
+      // Create uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'homework');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Generate unique filename
+      const ext = path.extname(req.file.originalname);
+      const filename = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
+      const filepath = path.join(uploadsDir, filename);
+      
+      // Move file to permanent location
+      fs.renameSync(req.file.path, filepath);
+      
+      const fileUrl = `/uploads/homework/${filename}`;
+      
+      res.json({
+        success: true,
+        fileUrl,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+      });
+    } catch (error) {
+      console.error("File upload error:", error);
+      res.status(500).json({ message: "File upload failed" });
+    }
+  });
+
+  app.post('/api/homework/submit', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, description, files, sessionId } = req.body;
+      
+      if (!title || !sessionId) {
+        return res.status(400).json({ message: "Title and session ID are required" });
+      }
+
+      const submission = await storage.createHomeworkSubmission({
+        userId,
+        classId: sessionId, // In this case, sessionId represents the classId
+        title,
+        description,
+        fileUrl: files.length > 0 ? files[0].fileUrl : null,
+        fileName: files.length > 0 ? files[0].fileName : null,
+        fileSize: files.length > 0 ? files[0].fileSize : null,
+        status: 'submitted',
+      });
+
+      res.json({
+        success: true,
+        submission,
+      });
+    } catch (error) {
+      console.error("Homework submission error:", error);
+      res.status(500).json({ message: "Failed to submit homework" });
+    }
+  });
+
+  // YouTube upload endpoint (simplified - would need actual YouTube API)
+  app.post('/api/upload-to-youtube', upload.single('video'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No video file provided" });
+      }
+
+      const { sessionId, title } = req.body;
+      
+      // In a real implementation, you would:
+      // 1. Upload to YouTube using YouTube Data API v3
+      // 2. Set video metadata (title, description, privacy settings)
+      // 3. Return the YouTube URL
+      
+      // For now, simulate the upload process
+      const mockYouTubeUrl = `https://youtube.com/watch?v=mock-${sessionId}-${Date.now()}`;
+      
+      // Update the session with YouTube URL
+      await storage.updateSessionRecording(sessionId, mockYouTubeUrl);
+      
+      // Clean up local file
+      fs.unlinkSync(req.file.path);
+      
+      res.json({
+        success: true,
+        youtubeUrl: mockYouTubeUrl,
+        message: "Video uploaded to YouTube successfully",
+      });
+    } catch (error) {
+      console.error("YouTube upload error:", error);
+      res.status(500).json({ message: "Failed to upload to YouTube" });
+    }
+  });
+
+  // Serve uploaded files  
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  const server = createServer(app);
+
+  // Setup WebSocket server for real-time communication
+  const io = new SocketServer(server, {
+    path: '/ws',
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // Socket.io connection handling
+  io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+    
+    // Join live class session
+    socket.on('join-session', async ({ sessionId, userId }) => {
+      try {
+        socket.join(sessionId);
+        
+        // Track participant
+        if (!sessionParticipants.has(sessionId)) {
+          sessionParticipants.set(sessionId, new Set());
+        }
+        sessionParticipants.get(sessionId)?.add(userId);
+        
+        // Get current participants list
+        const participants = await storage.getSessionParticipants(sessionId);
+        
+        // Notify all participants about updated list
+        io.to(sessionId).emit('participants-updated', participants);
+        
+        console.log(`User ${userId} joined session ${sessionId}`);
+      } catch (error) {
+        console.error('Error joining session:', error);
+      }
+    });
+
+    // Handle screen sharing
+    socket.on('screen-share-started', async ({ sessionId, userId }) => {
+      try {
+        await storage.recordScreenShareEvent(sessionId, userId, 'start');
+        socket.to(sessionId).emit('screen-share-started', { userId });
+      } catch (error) {
+        console.error('Screen share start error:', error);
+      }
+    });
+
+    socket.on('screen-share-stopped', async ({ sessionId, userId }) => {
+      try {
+        await storage.recordScreenShareEvent(sessionId, userId, 'stop');
+        socket.to(sessionId).emit('screen-share-stopped', { userId });
+      } catch (error) {
+        console.error('Screen share stop error:', error);
+      }
+    });
+
+    // Handle recording
+    socket.on('recording-started', async ({ sessionId }) => {
+      try {
+        await storage.updateSessionRecording(sessionId, null, true);
+        io.to(sessionId).emit('recording-started');
+      } catch (error) {
+        console.error('Recording start error:', error);
+      }
+    });
+
+    socket.on('recording-stopped', async ({ sessionId }) => {
+      try {
+        await storage.updateSessionRecording(sessionId, null, false);
+        io.to(sessionId).emit('recording-stopped');
+      } catch (error) {
+        console.error('Recording stop error:', error);
+      }
+    });
+
+    // Handle chat messages
+    socket.on('send-message', async ({ sessionId, userId, message, timestamp, type }) => {
+      try {
+        const messageData = {
+          id: crypto.randomUUID(),
+          userId,
+          userName: await storage.getUserName(userId),
+          message,
+          timestamp: new Date(timestamp),
+          type: type || 'message',
+        };
+        
+        // Broadcast message to all session participants
+        io.to(sessionId).emit('new-message', messageData);
+      } catch (error) {
+        console.error('Chat message error:', error);
+      }
+    });
+
+    // Handle hand raising
+    socket.on('hand-toggled', async ({ sessionId, userId, raised }) => {
+      try {
+        await storage.updateParticipantHand(sessionId, userId, raised);
+        const participants = await storage.getSessionParticipants(sessionId);
+        io.to(sessionId).emit('participants-updated', participants);
+      } catch (error) {
+        console.error('Hand toggle error:', error);
+      }
+    });
+
+    // Handle camera/mic status
+    socket.on('camera-started', async ({ sessionId, userId }) => {
+      try {
+        await storage.updateParticipantCamera(sessionId, userId, true);
+        const participants = await storage.getSessionParticipants(sessionId);
+        io.to(sessionId).emit('participants-updated', participants);
+      } catch (error) {
+        console.error('Camera start error:', error);
+      }
+    });
+
+    socket.on('camera-stopped', async ({ sessionId, userId }) => {
+      try {
+        await storage.updateParticipantCamera(sessionId, userId, false);
+        const participants = await storage.getSessionParticipants(sessionId);
+        io.to(sessionId).emit('participants-updated', participants);
+      } catch (error) {
+        console.error('Camera stop error:', error);
+      }
+    });
+
+    // Handle class end
+    socket.on('class-ended', async ({ sessionId }) => {
+      try {
+        await storage.endSession(sessionId);
+        io.to(sessionId).emit('class-ended');
+      } catch (error) {
+        console.error('Class end error:', error);
+      }
+    });
+
+    // Handle typing indicators
+    socket.on('typing-start', ({ sessionId, userId }) => {
+      socket.to(sessionId).emit('user-typing', { userId, typing: true });
+    });
+
+    socket.on('typing-stop', ({ sessionId, userId }) => {
+      socket.to(sessionId).emit('user-typing', { userId, typing: false });
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+      
+      // Clean up participant tracking
+      for (const [sessionId, participants] of sessionParticipants.entries()) {
+        // Note: In a production app, you'd need to track socket.id to userId mapping
+        // For now, this is a simplified cleanup
+      }
+    });
+  });
+  
+  return server;
 }

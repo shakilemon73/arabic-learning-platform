@@ -161,3 +161,90 @@ export type InsertInstructor = z.infer<typeof insertInstructorSchema>;
 export type ClassAttendance = typeof classAttendance.$inferSelect;
 export type PaymentRecord = typeof paymentRecords.$inferSelect;
 export type InsertPaymentRecord = z.infer<typeof insertPaymentRecordSchema>;
+
+// Live class sessions for screen sharing and recording
+export const liveClassSessions = pgTable("live_class_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").references(() => liveClasses.id).notNull(),
+  instructorId: varchar("instructor_id").references(() => users.id).notNull(),
+  sessionToken: varchar("session_token").unique().notNull(),
+  isActive: boolean("is_active").default(false),
+  isRecording: boolean("is_recording").default(false),
+  recordingUrl: varchar("recording_url"),
+  youtubeUrl: varchar("youtube_url"),
+  screenShareActive: boolean("screen_share_active").default(false),
+  participantCount: integer("participant_count").default(0),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Homework submissions
+export const homeworkSubmissions = pgTable("homework_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  classId: varchar("class_id").references(() => liveClasses.id).notNull(),
+  sessionId: varchar("session_id").references(() => liveClassSessions.id),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  fileUrl: varchar("file_url"),
+  fileName: varchar("file_name"),
+  fileSize: integer("file_size"),
+  status: varchar("status").default("submitted"), // submitted, reviewed, approved, needs_revision
+  grade: integer("grade"), // 0-100
+  feedback: text("feedback"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+// Session participants for tracking live class attendance
+export const sessionParticipants = pgTable("session_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").references(() => liveClassSessions.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  leftAt: timestamp("left_at"),
+  isActive: boolean("is_active").default(true),
+  participationScore: integer("participation_score").default(0),
+});
+
+// Screen share events for tracking
+export const screenShareEvents = pgTable("screen_share_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").references(() => liveClassSessions.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  eventType: varchar("event_type").notNull(), // start, stop, pause, resume
+  timestamp: timestamp("timestamp").defaultNow(),
+  metadata: jsonb("metadata"), // Additional data like screen type, resolution, etc.
+});
+
+// Insert schemas for new tables
+export const insertLiveClassSessionSchema = createInsertSchema(liveClassSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHomeworkSubmissionSchema = createInsertSchema(homeworkSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
+export const insertSessionParticipantSchema = createInsertSchema(sessionParticipants).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export const insertScreenShareEventSchema = createInsertSchema(screenShareEvents).omit({
+  id: true,
+  timestamp: true,
+});
+
+// Types for new tables
+export type LiveClassSession = typeof liveClassSessions.$inferSelect;
+export type InsertLiveClassSession = z.infer<typeof insertLiveClassSessionSchema>;
+export type HomeworkSubmission = typeof homeworkSubmissions.$inferSelect;
+export type InsertHomeworkSubmission = z.infer<typeof insertHomeworkSubmissionSchema>;
+export type SessionParticipant = typeof sessionParticipants.$inferSelect;
+export type InsertSessionParticipant = z.infer<typeof insertSessionParticipantSchema>;
+export type ScreenShareEvent = typeof screenShareEvents.$inferSelect;
+export type InsertScreenShareEvent = z.infer<typeof insertScreenShareEventSchema>;
