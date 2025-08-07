@@ -4,6 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://sgyanvjlwlrzcrpjwlsd.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNneWFudmpsd2xyemNycGp3bHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NTg1MjAsImV4cCI6MjA3MDEzNDUyMH0.5xjMdSUdeHGln68tfuw626q4xDZkuR8Xg_e_w6g9iJk';
 
+console.log('🔧 Supabase Configuration:', {
+  url: supabaseUrl ? 'URL provided' : 'URL missing',
+  key: supabaseAnonKey ? 'Key provided' : 'Key missing',
+  envUrl: import.meta.env.VITE_SUPABASE_URL ? 'ENV URL found' : 'ENV URL missing',
+  envKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'ENV Key found' : 'ENV Key missing'
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
 }
@@ -42,8 +49,15 @@ export const signOut = async () => {
 };
 
 export const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  return { user, error };
+  console.log('🔐 Getting current user from Supabase...');
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('🔐 Supabase getUser response:', { user: user ? 'User exists' : 'No user', error });
+    return { user, error };
+  } catch (err) {
+    console.error('💥 Exception in getCurrentUser:', err);
+    return { user: null, error: err };
+  }
 };
 
 // Database helper functions

@@ -12,9 +12,23 @@ import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
 
 function Router() {
-  const { user, loading } = useSupabaseAuth();
+  const { user, loading, error } = useSupabaseAuth();
   const isAuthenticated = !!user;
   const isLoading = loading;
+
+  // If there's an authentication timeout or error, show the landing page
+  if (error && error.includes('timeout')) {
+    console.log('🚨 Auth timeout detected - showing landing page');
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/live-class" component={LiveClass} />
+        <Route path="/course-registration" component={CourseRegistration} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -25,6 +39,10 @@ function Router() {
           </div>
           <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">লোড হচ্ছে...</p>
+          <p className="text-sm text-gray-500 mt-2">Authentication in progress...</p>
+          {error && (
+            <p className="text-red-600 text-sm mt-2">{error}</p>
+          )}
         </div>
       </div>
     );
