@@ -76,6 +76,22 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Skip auth setup in development mode without Replit domains
+  if (process.env.NODE_ENV === 'development' && !process.env.REPLIT_DOMAINS) {
+    console.log('⚠️  Running in development mode without Replit auth - using mock authentication');
+    
+    // Add development login endpoint
+    app.get("/api/login", (req, res) => {
+      res.redirect("/");
+    });
+    
+    app.get("/api/logout", (req, res) => {
+      res.redirect("/");
+    });
+    
+    return;
+  }
+
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
@@ -132,6 +148,21 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Development mode bypass - create mock user
+  if (process.env.NODE_ENV === 'development' && !process.env.REPLIT_DOMAINS) {
+    (req as any).user = {
+      claims: {
+        sub: 'dev-user-123',
+        name: 'Development User',
+        email: 'dev@example.com',
+        first_name: 'Development',
+        last_name: 'User'
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 3600 // expires in 1 hour
+    };
+    return next();
+  }
+
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {

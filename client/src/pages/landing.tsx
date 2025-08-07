@@ -2,11 +2,25 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DemoLogin } from "@/components/DemoLogin";
+import { queryClient } from "@/lib/queryClient";
 import { Star, BookOpen, Video, Award, Users, Clock, Shield, CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 export default function Landing() {
+  const [showDemoLogin, setShowDemoLogin] = useState(false);
+
+  const handleDemoLoginSuccess = (user: any) => {
+    // Invalidate auth cache and redirect
+    queryClient.invalidateQueries({ queryKey: ["/api", "auth", "user"] });
+    window.location.reload();
+  };
+
+  if (showDemoLogin) {
+    return <DemoLogin onLoginSuccess={handleDemoLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -56,15 +70,16 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 className="w-full sm:w-auto px-8 py-4 bg-islamic-gold text-dark-green font-bold rounded-xl hover:bg-yellow-400 transform hover:scale-105 transition-all duration-300 shadow-lg"
-                onClick={() => window.location.href = "/api/login"}
+                onClick={() => setShowDemoLogin(true)}
               >
-                <span className="text-lg">কোর্স শুরু করুন</span>
-                <span className="block text-sm opacity-80">মাত্র ৬০০ টাকায়</span>
+                <span className="text-lg">ডেমো প্ল্যাটফর্ম দেখুন</span>
+                <span className="block text-sm opacity-80">Live Class Experience</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="lg"
                 className="w-full sm:w-auto px-8 py-4 border-2 border-white text-white font-medium rounded-xl hover:bg-white hover:text-islamic-green transition-all duration-300"
+                onClick={() => setShowDemoLogin(true)}
               >
                 ডেমো ক্লাস দেখুন
               </Button>

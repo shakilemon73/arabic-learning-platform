@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server as SocketServer } from "socket.io";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupDemoAuth, isDemoAuthenticated } from "./demoAuth";
 import { insertUserSchema, insertHomeworkSubmissionSchema, insertLiveClassSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
@@ -52,11 +53,19 @@ const sessionParticipants = new Map<string, Set<string>>();
 const participantSockets = new Map<string, WebSocket>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup demo auth for development
+  if (process.env.NODE_ENV === 'development') {
+    await setupDemoAuth(app);
+  }
+  
   // Auth middleware
   await setupAuth(app);
 
+  // Choose auth middleware based on environment
+  const authMiddleware = process.env.NODE_ENV === 'development' ? isDemoAuthenticated : isAuthenticated;
+
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auth/user', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -68,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Course registration endpoint
-  app.post('/api/register', async (req, res) => {
+  app.post('/api/register', authMiddleware, async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validatedData);
@@ -293,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get upcoming classes (protected)
-  app.get('/api/upcoming-classes', isAuthenticated, async (req, res) => {
+  app.get('/api/upcoming-classes', authMiddleware, async (req, res) => {
     try {
       const classes = await storage.getUpcomingClasses();
       res.json(classes);
@@ -315,7 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Record class attendance (protected)
-  app.post('/api/attendance', isAuthenticated, async (req: any, res) => {
+  app.post('/api/attendance', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { classId, duration } = req.body;
@@ -329,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user's attendance history (protected)
-  app.get('/api/my-attendance', isAuthenticated, async (req: any, res) => {
+  app.get('/api/my-attendance', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const attendance = await storage.getUserAttendance(userId);
@@ -341,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update course progress (protected)
-  app.patch('/api/progress', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/progress', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { progress } = req.body;
@@ -359,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Live class session management
-  app.post('/api/live-sessions/create', isAuthenticated, async (req: any, res) => {
+  app.post('/api/live-sessions/create', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { classId } = req.body;
@@ -420,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/homework/submit', isAuthenticated, async (req: any, res) => {
+  app.post('/api/homework/submit', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { title, description, files, sessionId } = req.body;
