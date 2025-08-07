@@ -69,7 +69,7 @@ export default function LiveClassPage() {
               <p className="text-muted-foreground font-bengali mb-6">
                 লাইভ ক্লাসে অংশগ্রহণের জন্য প্রথমে লগইন করুন
               </p>
-              <Button onClick={() => navigate('/login')} className="btn-kinetic">
+              <Button onClick={() => navigate('/')} className="btn-kinetic">
                 লগইন করুন
               </Button>
             </CardContent>

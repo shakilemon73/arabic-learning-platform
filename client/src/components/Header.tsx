@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,7 +12,9 @@ import { Menu, X, User, LogOut, Home, BookOpen, Monitor } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
-  const { user, isAuthenticated } = useAuth();
+  const { user: authUser, signOut } = useSupabaseAuth();
+  const isAuthenticated = !!authUser;
+  const user = authUser;
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -61,9 +63,9 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || 'User'} />
+                      <AvatarImage src={user.user_metadata?.avatar_url || undefined} alt={user.user_metadata?.first_name || 'User'} />
                       <AvatarFallback>
-                        {user.firstName ? user.firstName[0].toUpperCase() : <User className="h-4 w-4" />}
+                        {user.user_metadata?.first_name ? user.user_metadata.first_name[0].toUpperCase() : <User className="h-4 w-4" />}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -71,8 +73,8 @@ export default function Header() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      {user.firstName && (
-                        <p className="font-medium">{user.firstName} {user.lastName}</p>
+                      {user.user_metadata?.first_name && (
+                        <p className="font-medium">{user.user_metadata.first_name} {user.user_metadata?.last_name || ''}</p>
                       )}
                       {user.email && (
                         <p className="w-[200px] truncate text-sm text-muted-foreground">
@@ -81,17 +83,23 @@ export default function Header() {
                       )}
                     </div>
                   </div>
-                  <DropdownMenuItem asChild>
-                    <a href="/api/logout" className="flex items-center">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      লগ আউট
-                    </a>
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      await signOut();
+                    }}
+                    className="flex items-center cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    লগ আউট
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild className="bg-green-600 hover:bg-green-700 text-white">
-                <a href="/api/login">লগইন</a>
+              <Button 
+                onClick={() => window.location.href = "/"}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                লগইন
               </Button>
             )}
 

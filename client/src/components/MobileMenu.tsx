@@ -18,13 +18,13 @@ export default function MobileMenu({ isOpen, onClose, isAuthenticated, user }: M
         {isAuthenticated && user && (
           <div className="flex items-center space-x-3 pb-3 border-b border-gray-200">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user.profileImageUrl} alt={user.firstName} />
+              <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.first_name || 'User'} />
               <AvatarFallback className="bg-islamic-green text-white">
-                {user.firstName ? user.firstName.charAt(0) : "ম"}
+                {user.user_metadata?.first_name ? user.user_metadata.first_name.charAt(0) : "ম"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+              <p className="font-medium text-gray-900">{user.user_metadata?.first_name} {user.user_metadata?.last_name || ''}</p>
               <p className="text-sm text-gray-600">{user.email}</p>
             </div>
           </div>
@@ -88,7 +88,8 @@ export default function MobileMenu({ isOpen, onClose, isAuthenticated, user }: M
               className="w-full justify-start text-red-600 border-red-600 hover:bg-red-50"
               onClick={() => {
                 onClose();
-                window.location.href = "/api/logout";
+                // Trigger logout in parent component
+                window.location.href = "/";
               }}
             >
               <LogOut className="w-5 h-5 mr-3" />
@@ -101,7 +102,7 @@ export default function MobileMenu({ isOpen, onClose, isAuthenticated, user }: M
                 className="w-full justify-start text-islamic-green border-islamic-green hover:bg-islamic-green hover:text-white"
                 onClick={() => {
                   onClose();
-                  window.location.href = "/api/login";
+                  window.location.href = "/";
                 }}
               >
                 লগইন
@@ -110,7 +111,7 @@ export default function MobileMenu({ isOpen, onClose, isAuthenticated, user }: M
                 className="w-full justify-start bg-islamic-green hover:bg-dark-green"
                 onClick={() => {
                   onClose();
-                  window.location.href = "/api/login";
+                  window.location.href = "/";
                 }}
               >
                 নিবন্ধন করুন
