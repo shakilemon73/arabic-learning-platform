@@ -57,27 +57,7 @@ export default function LiveClassPage() {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-soft-mint via-white to-cream">
-        <div className="max-w-2xl mx-auto py-20">
-          <Card className="bento-card text-center">
-            <CardContent className="p-8">
-              <h2 className="text-headline font-bengali mb-4">
-                লগইন প্রয়োজন
-              </h2>
-              <p className="text-muted-foreground font-bengali mb-6">
-                লাইভ ক্লাসে অংশগ্রহণের জন্য প্রথমে লগইন করুন
-              </p>
-              <Button onClick={() => navigate('/')} className="btn-kinetic">
-                লগইন করুন
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // Remove authentication check - all users can access
 
   if (isClassActive && sessionId) {
     return (
@@ -85,7 +65,7 @@ export default function LiveClassPage() {
         sessionId={sessionId}
         isInstructor={isInstructor}
         classTitle={classData.title}
-        userId={user.id}
+        userId={mockUser.id}
       />
     );
   }
