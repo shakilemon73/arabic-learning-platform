@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import { useQuery } from "@tanstack/react-query";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { supabase } from "@/lib/supabase";
 
 export default function Dashboard() {
-  const { user, loading } = useSupabaseAuth();
+  const { user, userProfile, loading } = useSupabaseAuth();
   const isAuthenticated = !!user;
   const isLoading = loading;
   const { toast } = useToast();
@@ -44,34 +44,67 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  // Get user's attendance
-  const { data: attendance } = useQuery({
-    queryKey: ["/api/my-attendance"],
-    enabled: isAuthenticated,
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "অননুমোদিত",
-          description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 500);
-        return;
-      }
+  // Get user's attendance using direct Supabase call
+  const { data: attendance = [] } = useQuery({
+    queryKey: ["user-attendance", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from('class_attendance')
+        .select(`
+          *,
+          live_classes!inner (
+            title,
+            title_bn,
+            scheduled_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('attended_at', { ascending: false });
+      return data || [];
     },
+    enabled: isAuthenticated && !!user,
   });
 
-  // Get course modules
-  const { data: modules } = useQuery({
-    queryKey: ["/api/course-modules"],
+  // Get course modules using direct Supabase call
+  const { data: modules = [] } = useQuery({
+    queryKey: ["course-modules"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('course_modules')
+        .select('*')
+        .eq('is_active', true)
+        .order('level', { ascending: true })
+        .order('order', { ascending: true });
+      return data || [];
+    },
     enabled: isAuthenticated,
   });
 
-  // Get live classes
-  const { data: liveClasses } = useQuery({
-    queryKey: ["/api/live-classes"],
+  // Get live classes using direct Supabase call
+  const { data: liveClasses = [] } = useQuery({
+    queryKey: ["live-classes"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('live_classes')
+        .select(`
+          *,
+          course_modules!inner (
+            title,
+            title_bn,
+            level
+          ),
+          instructors!inner (
+            name,
+            name_bn,
+            email
+          )
+        `)
+        .eq('is_active', true)
+        .order('scheduled_at', { ascending: false })
+        .limit(10);
+      return data || [];
+    },
     enabled: isAuthenticated,
   });
 
@@ -87,8 +120,8 @@ export default function Dashboard() {
     return null;
   }
 
-  const enrollmentStatus = user?.enrollmentStatus;
-  const paymentStatus = user?.paymentStatus;
+  const enrollmentStatus = userProfile?.enrollmentStatus;
+  const paymentStatus = userProfile?.paymentStatus;
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,12 +134,12 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4 mb-4 md:mb-0">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {user?.firstName ? user.firstName.charAt(0) : "ম"}
+                  {userProfile?.firstName ? userProfile.firstName.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  {user?.firstName || "শিক্ষার্থী"} {user?.lastName || ""}
+                  {userProfile?.firstName || "শিক্ষার্থী"} {userProfile?.lastName || ""}
                 </h1>
                 <p className="opacity-90">শিক্ষার্থী আইডি: #{user?.id?.slice(-5)}</p>
               </div>
@@ -134,11 +167,11 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {user?.courseProgress || 0}%
+                {userProfile?.courseProgress || 0}%
               </div>
               <div className="text-sm text-gray-600 mb-3">কোর্স সম্পন্ন</div>
               <Progress 
-                value={user?.courseProgress || 0} 
+                value={userProfile?.courseProgress || 0} 
                 className="h-3"
               />
             </CardContent>
@@ -148,7 +181,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {user?.classesAttended || 0}
+                {userProfile?.classesAttended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -158,7 +191,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Award className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {user?.certificateScore || 0}%
+                {userProfile?.certificateScore || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>
@@ -184,7 +217,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {liveClasses && liveClasses.length > 0 ? (
+                {liveClasses.length > 0 ? (
                   <div className="space-y-4">
                     {liveClasses.map((classItem: any) => (
                       <div key={classItem.id} className="flex items-center justify-between p-4 bg-soft-mint rounded-lg">
@@ -241,7 +274,7 @@ export default function Dashboard() {
           {/* Modules Tab */}
           <TabsContent value="modules">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {modules && modules.length > 0 ? (
+              {modules.length > 0 ? (
                 modules.map((module: any) => (
                   <Card key={module.id}>
                     <CardHeader>
@@ -292,7 +325,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {attendance && attendance.length > 0 ? (
+                {attendance.length > 0 ? (
                   <div className="space-y-4">
                     {attendance.map((record: any) => (
                       <div key={record.id} className="flex items-center justify-between p-4 bg-soft-mint rounded-lg">
@@ -342,7 +375,7 @@ export default function Dashboard() {
                     কোর্স সম্পন্ন করার পর আপনি সার্টিফিকেট ডাউনলোড করতে পারবেন
                   </p>
                   
-                  {(user?.courseProgress || 0) >= 100 ? (
+                  {(userProfile?.courseProgress || 0) >= 100 ? (
                     <Button className="bg-islamic-gold text-dark-green hover:bg-yellow-400">
                       <Download className="w-4 h-4 mr-2" />
                       সার্টিফিকেট ডাউনলোড
@@ -350,9 +383,9 @@ export default function Dashboard() {
                   ) : (
                     <div className="bg-soft-mint rounded-lg p-6">
                       <p className="text-gray-700 mb-4">
-                        সার্টিফিকেটের জন্য আরও {100 - (user?.courseProgress || 0)}% কোর্স সম্পন্ন করুন
+                        সার্টিফিকেটের জন্য আরও {100 - (userProfile?.courseProgress || 0)}% কোর্স সম্পন্ন করুন
                       </p>
-                      <Progress value={user?.courseProgress || 0} className="h-3" />
+                      <Progress value={userProfile?.courseProgress || 0} className="h-3" />
                     </div>
                   )}
                 </div>

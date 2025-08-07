@@ -1,18 +1,25 @@
 import { useState, useEffect } from 'react';
-import { supabase, getCurrentUser, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut } from '@/lib/supabase';
+import { supabase, getCurrentUser, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut, getUserProfile } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import type { User as DBUser } from '@shared/schema';
 
 export const useSupabaseAuth = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<DBUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session and user profile
     const getInitialSession = async () => {
       try {
         const { user: currentUser } = await getCurrentUser();
         setUser(currentUser);
+        
+        if (currentUser) {
+          const { data: profile } = await getUserProfile(currentUser.id);
+          setUserProfile(profile);
+        }
       } catch (err) {
         console.error('Error getting user:', err);
         setError('Failed to get user session');
@@ -32,6 +39,10 @@ export const useSupabaseAuth = () => {
         if (event === 'SIGNED_IN' && session?.user) {
           // Create or update user profile when signing in
           await ensureUserProfile(session.user);
+          const { data: profile } = await getUserProfile(session.user.id);
+          setUserProfile(profile);
+        } else if (event === 'SIGNED_OUT') {
+          setUserProfile(null);
         }
       }
     );
@@ -137,6 +148,7 @@ export const useSupabaseAuth = () => {
 
   return {
     user,
+    userProfile,
     loading,
     error,
     signIn,
