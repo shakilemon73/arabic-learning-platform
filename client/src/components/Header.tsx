@@ -95,12 +95,11 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button 
-                onClick={() => window.location.href = "/"}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                লগইন
-              </Button>
+              <Link href="/login">
+                <Button className="bg-green-600 hover:bg-green-700 text-white">
+                  লগইন
+                </Button>
+              </Link>
             )}
 
             {/* Mobile Menu Button */}

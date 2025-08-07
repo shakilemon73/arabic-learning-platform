@@ -19,7 +19,7 @@ export const useSupabaseAuth = () => {
         console.log('⏰ Auth check timeout - forcing loading to false');
         setLoading(false);
         setError('Authentication timeout - please refresh');
-      }, 5000); // 5 second timeout
+      }, 8000); // 8 second timeout
       
       try {
         console.log('📡 Calling getCurrentUser...');
@@ -79,9 +79,13 @@ export const useSupabaseAuth = () => {
           await ensureUserProfile(session.user);
           const { data: profile } = await getUserProfile(session.user.id);
           setUserProfile(profile);
+          
+          // Clear any existing error when user successfully signs in
+          setError(null);
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 User signed out');
           setUserProfile(null);
+          setError(null);
         }
       }
     );
