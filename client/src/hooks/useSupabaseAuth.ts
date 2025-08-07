@@ -7,6 +7,7 @@ export const useSupabaseAuth = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<DBUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const loadUserProfile = async (userId: string) => {
     try {
@@ -35,9 +36,12 @@ export const useSupabaseAuth = () => {
           if (currentUser) {
             await loadUserProfile(currentUser.id);
           }
+          setLoading(false);
         }
       } catch (err) {
-        // Silently handle auth errors
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -129,6 +133,7 @@ export const useSupabaseAuth = () => {
     user,
     userProfile,
     error,
+    loading,
     signIn,
     signUp,
     signOut,
