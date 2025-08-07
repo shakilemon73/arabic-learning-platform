@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, Clock, Users, Play, Pause } from 'lucide-react';
 import LiveClassroom from '@/components/LiveClassroom';
-import { useAuth } from '@/hooks/useAuth';
+// Mock user for demonstration
 import { useState } from 'react';
 
 export default function LiveClassPage() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const mockUser = { id: "demo-user-1", email: "user@example.com" };
   const [isClassActive, setIsClassActive] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export default function LiveClassPage() {
     queryKey: ['/api/upcoming-classes'],
   });
 
-  const isInstructor = user?.email === 'instructor@example.com'; // Mock check
+  const isInstructor = mockUser?.email === 'instructor@example.com'; // Mock check
 
   const handleJoinClass = async () => {
     try {

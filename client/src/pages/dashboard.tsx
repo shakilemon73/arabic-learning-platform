@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,109 +18,85 @@ import {
   AlertCircle
 } from "lucide-react";
 import Header from "@/components/Header";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import type { AttendanceWithClass, CourseModule, LiveClassWithDetails } from "@/lib/types";
 
 export default function Dashboard() {
-  const { user, userProfile, loading } = useSupabaseAuth();
-  const isAuthenticated = !!user;
-  const isLoading = loading;
   const { toast } = useToast();
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "অননুমোদিত প্রবেশ",
-        description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 500);
-      return;
+  // Mock user data for demonstration
+  const mockUser = {
+    id: "demo-user-1",
+    email: "user@example.com",
+    first_name: "আহমেদ",
+    last_name: "হাসান"
+  };
+
+  const mockUserProfile = {
+    enrollment_status: "enrolled",
+    payment_status: "paid",
+    course_progress: 65,
+    classes_attended: 12,
+    certificate_score: 85
+  };
+
+  // Mock attendance data
+  const attendance = [
+    {
+      id: "1",
+      user_id: "demo-user-1",
+      class_id: "class-1",
+      duration: 45,
+      attended_at: "2025-01-01T10:00:00Z",
+      live_classes: {
+        title: "Arabic Alphabet Basics",
+        title_bn: "আরবি বর্ণমালার মৌলিক বিষয়",
+        scheduled_at: "2025-01-01T10:00:00Z"
+      }
     }
-  }, [isAuthenticated, isLoading, toast]);
+  ];
 
-  // Get user's attendance using direct Supabase call
-  const { data: attendance = [] } = useQuery<AttendanceWithClass[]>({
-    queryKey: ["user-attendance", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data } = await supabase
-        .from('class_attendance')
-        .select(`
-          *,
-          live_classes!inner (
-            title,
-            title_bn,
-            scheduled_at
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('attended_at', { ascending: false });
-      return data || [];
+  // Mock course modules data
+  const modules = [
+    {
+      id: "module-1",
+      title: "Arabic Alphabet",
+      title_bn: "আরবি বর্ণমালা",
+      level: 1,
+      order: 1,
+      is_active: true
     },
-    enabled: isAuthenticated && !!user,
-  });
+    {
+      id: "module-2", 
+      title: "Basic Grammar",
+      title_bn: "মৌলিক ব্যাকরণ",
+      level: 2,
+      order: 2,
+      is_active: true
+    }
+  ];
 
-  // Get course modules using direct Supabase call
-  const { data: modules = [] } = useQuery<CourseModule[]>({
-    queryKey: ["course-modules"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('is_active', true)
-        .order('level', { ascending: true })
-        .order('order', { ascending: true });
-      return data || [];
-    },
-    enabled: isAuthenticated,
-  });
+  // Mock live classes data
+  const liveClasses = [
+    {
+      id: "class-1",
+      title: "Arabic Reading Practice",
+      title_bn: "আরবি পড়ার অনুশীলন",
+      scheduled_at: "2025-01-08T14:00:00Z",
+      duration: 60,
+      course_modules: {
+        title: "Reading Skills",
+        title_bn: "পড়ার দক্ষতা",
+        level: 2
+      },
+      instructors: {
+        name: "Dr. Ahmed",
+        name_bn: "ড. আহমেদ",
+        email: "ahmed@example.com"
+      }
+    }
+  ];
 
-  // Get live classes using direct Supabase call
-  const { data: liveClasses = [] } = useQuery({
-    queryKey: ["live-classes"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('live_classes')
-        .select(`
-          *,
-          course_modules!inner (
-            title,
-            title_bn,
-            level
-          ),
-          instructors!inner (
-            name,
-            name_bn,
-            email
-          )
-        `)
-        .eq('is_active', true)
-        .order('scheduled_at', { ascending: false })
-        .limit(10);
-      return data || [];
-    },
-    enabled: isAuthenticated,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const enrollmentStatus = userProfile?.enrollment_status;
-  const paymentStatus = userProfile?.payment_status;
+  const enrollmentStatus = mockUserProfile?.enrollment_status;
+  const paymentStatus = mockUserProfile?.payment_status;
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,14 +109,14 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4 mb-4 md:mb-0">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {userProfile?.first_name ? userProfile.first_name.charAt(0) : "ম"}
+                  {mockUser?.first_name ? mockUser.first_name.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  {userProfile?.first_name || "শিক্ষার্থী"} {userProfile?.last_name || ""}
+                  {mockUser?.first_name || "শিক্ষার্থী"} {mockUser?.last_name || ""}
                 </h1>
-                <p className="opacity-90">শিক্ষার্থী আইডি: #{user?.id?.slice(-5)}</p>
+                <p className="opacity-90">শিক্ষার্থী আইডি: #{mockUser?.id?.slice(-5)}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -168,11 +142,11 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.course_progress || 0}%
+                {mockUserProfile?.course_progress || 0}%
               </div>
               <div className="text-sm text-gray-600 mb-3">কোর্স সম্পন্ন</div>
               <Progress 
-                value={userProfile?.course_progress || 0} 
+                value={mockUserProfile?.course_progress || 0} 
                 className="h-3"
               />
             </CardContent>
@@ -182,7 +156,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.classes_attended || 0}
+                {mockUserProfile?.classes_attended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -192,7 +166,7 @@ export default function Dashboard() {
             <CardContent className="p-6 text-center">
               <Award className="w-12 h-12 text-islamic-green mx-auto mb-4" />
               <div className="text-3xl font-bold text-islamic-green mb-2">
-                {userProfile?.certificate_score || 0}%
+                {mockUserProfile?.certificate_score || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>
@@ -376,7 +350,7 @@ export default function Dashboard() {
                     কোর্স সম্পন্ন করার পর আপনি সার্টিফিকেট ডাউনলোড করতে পারবেন
                   </p>
                   
-                  {(userProfile?.course_progress || 0) >= 100 ? (
+                  {(mockUserProfile?.course_progress || 0) >= 100 ? (
                     <Button className="bg-islamic-gold text-dark-green hover:bg-yellow-400">
                       <Download className="w-4 h-4 mr-2" />
                       সার্টিফিকেট ডাউনলোড
@@ -384,9 +358,9 @@ export default function Dashboard() {
                   ) : (
                     <div className="bg-soft-mint rounded-lg p-6">
                       <p className="text-gray-700 mb-4">
-                        সার্টিফিকেটের জন্য আরও {100 - (userProfile?.course_progress || 0)}% কোর্স সম্পন্ন করুন
+                        সার্টিফিকেটের জন্য আরও {100 - (mockUserProfile?.course_progress || 0)}% কোর্স সম্পন্ন করুন
                       </p>
-                      <Progress value={userProfile?.course_progress || 0} className="h-3" />
+                      <Progress value={mockUserProfile?.course_progress || 0} className="h-3" />
                     </div>
                   )}
                 </div>

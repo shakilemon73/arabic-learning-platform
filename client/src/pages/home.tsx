@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,69 +15,44 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+// Mock data for demonstration
 
 export default function Home() {
-  const { user, userProfile, loading } = useSupabaseAuth();
-  const isAuthenticated = !!user;
-  const isLoading = loading;
   const { toast } = useToast();
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "অননুমোদিত প্রবেশ",
-        description: "আপনি লগ আউট হয়ে গেছেন। আবার লগইন করুন...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 500);
-      return;
+  // Mock user data
+  const mockUser = {
+    id: "demo-user-1",
+    first_name: "আহমেদ",
+    last_name: "হাসান"
+  };
+
+  // Mock upcoming classes
+  const upcomingClasses = [
+    {
+      id: "class-1",
+      title: "Arabic Reading Practice",
+      title_bn: "আরবি পড়ার অনুশীলন",
+      scheduled_at: "2025-01-08T14:00:00Z",
+      course_modules: {
+        title: "Reading Skills",
+        title_bn: "পড়ার দক্ষতা",
+        level: 2
+      },
+      instructors: {
+        name: "Dr. Ahmed",
+        name_bn: "ড. আহমেদ"
+      }
     }
-  }, [isAuthenticated, isLoading, toast]);
+  ];
 
-  // Get upcoming classes using direct Supabase call
-  const { data: upcomingClasses = [], isLoading: classesLoading } = useQuery({
-    queryKey: ["upcoming-classes"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('live_classes')
-        .select(`
-          *,
-          course_modules!inner (
-            title,
-            title_bn,
-            level
-          ),
-          instructors!inner (
-            name,
-            name_bn,
-            email
-          )
-        `)
-        .eq('is_active', true)
-        .gte('scheduled_at', new Date().toISOString())
-        .order('scheduled_at', { ascending: true })
-        .limit(10);
-      return data || [];
-    },
-    enabled: isAuthenticated,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null; // Will redirect via useEffect
-  }
+  const mockUserProfile = {
+    enrollment_status: "enrolled",
+    first_name: "আহমেদ",
+    course_progress: 65,
+    classes_attended: 12,
+    certificate_score: 85
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,18 +65,18 @@ export default function Home() {
             <div className="flex items-center space-x-4 mb-4">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold">
-                  {userProfile?.first_name ? userProfile.first_name.charAt(0) : "ম"}
+                  {mockUserProfile?.first_name ? mockUserProfile.first_name.charAt(0) : "ম"}
                 </span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  আসসালামু আলাইকুম, {userProfile?.first_name || "ভাই/বোন"}!
+                  আসসালামু আলাইকুম, {mockUserProfile?.first_name || "ভাই/বোন"}!
                 </h1>
                 <p className="opacity-90">আপনার আরবি শিক্ষার যাত্রায় স্বাগতম</p>
               </div>
             </div>
             
-            {userProfile?.enrollment_status === "enrolled" ? (
+            {mockUserProfile?.enrollment_status === "enrolled" ? (
               <Badge className="bg-islamic-gold text-dark-green">
                 ✓ কোর্সে নিবন্ধিত
               </Badge>
@@ -121,11 +94,11 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <TrendingUp className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.course_progress || 0}%
+                {mockUserProfile?.course_progress || 0}%
               </div>
               <div className="text-sm text-gray-600">কোর্স সম্পন্ন</div>
               <Progress 
-                value={userProfile?.course_progress || 0} 
+                value={mockUserProfile?.course_progress || 0} 
                 className="mt-2 h-2"
               />
             </CardContent>
@@ -135,7 +108,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Calendar className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.classes_attended || 0}
+                {mockUserProfile?.classes_attended || 0}
               </div>
               <div className="text-sm text-gray-600">ক্লাসে উপস্থিতি</div>
             </CardContent>
@@ -145,7 +118,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Award className="w-8 h-8 text-islamic-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-islamic-green">
-                {userProfile?.certificate_score || 0}%
+                {mockUserProfile?.certificate_score || 0}%
               </div>
               <div className="text-sm text-gray-600">সার্টিফিকেট স্কোর</div>
             </CardContent>
@@ -169,7 +142,7 @@ export default function Home() {
                 আসন্ন ক্লাস সমূহ
               </h2>
               
-              {classesLoading ? (
+              {false ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="animate-pulse">
