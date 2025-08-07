@@ -3,7 +3,6 @@ import { exec } from 'child_process';
 
 console.log("🚀 Starting Arabic Learning Platform with Supabase backend...");
 console.log("📱 Express server removed - Using Vite frontend only");
-console.log("🔄 This application now uses Supabase for authentication and data storage");
 
 // Start Vite dev server
 const viteProcess = exec('npx vite --port 5000 --host 0.0.0.0', (error, stdout, stderr) => {
@@ -11,33 +10,31 @@ const viteProcess = exec('npx vite --port 5000 --host 0.0.0.0', (error, stdout, 
     console.error(`Vite process error: ${error}`);
     return;
   }
-  if (stdout) console.log(`Vite stdout: ${stdout}`);
-  if (stderr) console.error(`Vite stderr: ${stderr}`);
+  console.log(`Vite stdout: ${stdout}`);
+  console.error(`Vite stderr: ${stderr}`);
 });
 
 viteProcess.stdout?.on('data', (data) => {
-  process.stdout.write(data);
+  console.log(data.toString());
 });
 
 viteProcess.stderr?.on('data', (data) => {
-  process.stderr.write(data);
+  console.error(data.toString());
 });
 
 viteProcess.on('close', (code) => {
   console.log(`Vite process exited with code ${code}`);
-  process.exit(code || 0);
 });
 
-// Keep the process alive and handle shutdown gracefully
+// Keep the process alive
 process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down...');
-  viteProcess.kill('SIGINT');
+  console.log('Shutting down...');
+  viteProcess.kill();
+  process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n🛑 Shutting down...');
-  viteProcess.kill('SIGTERM');
+  console.log('Shutting down...');
+  viteProcess.kill();
+  process.exit(0);
 });
-
-// Prevent the process from exiting
-setInterval(() => {}, 1000);
