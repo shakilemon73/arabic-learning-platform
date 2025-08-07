@@ -93,16 +93,17 @@ export const useSupabaseAuth = () => {
         .single();
 
       console.log('👤 Profile check result:', existingProfile ? 'Profile exists' : 'No profile', fetchError);
+      console.log('🔍 Full error details:', fetchError);
 
-      if (fetchError && (fetchError.code === 'PGRST116' || fetchError.code === 'PGRST205')) {
+      if (fetchError && (fetchError.code === 'PGRST116' || fetchError.code === 'PGRST205' || fetchError.code === 'PGRST301')) {
         console.log('🆕 Creating new user profile...');
         // User doesn't exist, create profile
         const { error: insertError } = await supabase
           .from('users')
           .insert({
             id: authUser.id,
-            email: authUser.email,
-            first_name: authUser.user_metadata?.first_name || '',
+            email: authUser.email || '',
+            first_name: authUser.user_metadata?.first_name || authUser.user_metadata?.name || '',
             last_name: authUser.user_metadata?.last_name || '',
             profile_image_url: authUser.user_metadata?.avatar_url || null,
             enrollment_status: 'pending',
@@ -114,18 +115,24 @@ export const useSupabaseAuth = () => {
 
         if (insertError) {
           console.error('❌ Error creating user profile:', insertError);
+          console.error('🔍 Full insert error details:', insertError);
           // If table doesn't exist, just continue without profile
-          if (insertError.code === 'PGRST205') {
+          if (insertError.code === 'PGRST205' || insertError.message?.includes('relation') || insertError.message?.includes('does not exist')) {
             console.log('📋 Database tables not found - please run database setup');
+            setError('Database not properly configured. Please contact support.');
+            return;
           }
         } else {
           console.log('✅ User profile created successfully');
         }
       } else if (fetchError) {
         console.error('❌ Error fetching user profile:', fetchError);
-        // If table doesn't exist, just continue without profile  
-        if (fetchError.code === 'PGRST205') {
-          console.log('📋 Database tables not found - please run database setup');
+        console.error('🔍 Full fetch error details:', fetchError);
+        // If table doesn't exist or RLS prevents access, just continue without profile  
+        if (fetchError.code === 'PGRST205' || fetchError.code === 'PGRST301' || fetchError.message?.includes('relation') || fetchError.message?.includes('does not exist') || fetchError.message?.includes('RLS')) {
+          console.log('📋 Database access issue - continuing without profile for now');
+          // Don't set error here, just continue
+          return;
         }
       }
     } catch (err) {
