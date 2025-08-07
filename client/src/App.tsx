@@ -10,18 +10,22 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
-import SupabaseLogin from "@/components/SupabaseLogin";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 
 function Router() {
   const { user, loading, error } = useSupabaseAuth();
   const isAuthenticated = !!user;
   const isLoading = loading;
 
-  // If there's an authentication timeout or error, show the landing page
+  // If there's an authentication timeout or error, still show all routes
   if (error && error.includes('timeout')) {
-    console.log('🚨 Auth timeout detected - showing landing page');
+    console.log('🚨 Auth timeout detected - showing all routes as public');
     return (
       <Switch>
+        {/* Authentication routes - always accessible */}
+        <Route path="/login" component={LoginPage} />
+        <Route path="/register" component={RegisterPage} />
         <Route path="/" component={Landing} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/live-class" component={LiveClass} />
@@ -51,11 +55,13 @@ function Router() {
 
   return (
     <Switch>
+      {/* Authentication routes - always accessible */}
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/login" component={SupabaseLogin} />
-          <Route path="/register" component={SupabaseLogin} />
         </>
       ) : (
         <>
