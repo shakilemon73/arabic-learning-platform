@@ -8,7 +8,14 @@ This is an Arabic language learning platform that provides online courses with l
 - Implemented Supabase authentication with login/signup components
 - Application now runs as pure frontend with Supabase backend
 - All authentication flows updated to use Supabase Auth
+- Fixed Vite host allowlist configuration for Replit deployment
 - Migration checklist completed successfully
+
+**Recent Changes (2025-01-07):**
+- Removed Express server completely - now running Vite-only frontend
+- Created custom vite.dev.config.ts with proper host allowlist settings
+- Updated server/index.ts to launch Vite directly instead of Express
+- Configured allowedHosts to support Replit domain access
 
 # User Preferences
 
@@ -24,10 +31,11 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS with custom Islamic-themed color palette and Bengali typography support
 
 ## Backend Architecture
-- **Framework**: Supabase Backend-as-a-Service (BaaS)
+- **Framework**: Supabase Backend-as-a-Service (BaaS) - No Express server
 - **Authentication**: Supabase Auth with JWT tokens and secure session management
 - **Database**: PostgreSQL via Supabase with real-time subscriptions
-- **API Design**: Direct Supabase client calls from frontend (no Express server)
+- **API Design**: Direct Supabase client calls from frontend
+- **Deployment**: Vite-only frontend with custom host configuration for Replit
 
 ## Database Design
 - **Database**: PostgreSQL via Supabase with real-time capabilities
