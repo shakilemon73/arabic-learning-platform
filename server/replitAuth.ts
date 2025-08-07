@@ -31,14 +31,18 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  
+  // Use environment variable or generate a secure fallback for development
+  const sessionSecret = process.env.SESSION_SECRET || "c829b18e671a177b972dbf4491d559cae17ce13086f8ce0c5a67cae86e8bc21f";
+  
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: sessionSecret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });
