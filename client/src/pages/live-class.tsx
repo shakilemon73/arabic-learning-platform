@@ -50,29 +50,11 @@ export default function LiveClassPage() {
 
   const isInstructor = user?.email === 'instructor@example.com'; // Check if current user is instructor
 
-  const handleJoinClass = async () => {
-    try {
-      // Create a live session
-      const response = await fetch('/api/live-sessions/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          classId: selectedClass.id,
-        }),
-      });
-
-      if (response.ok) {
-        const session = await response.json();
-        setSessionId(session.id);
-        setIsClassActive(true);
-      } else {
-        console.error('Failed to create session');
-      }
-    } catch (error) {
-      console.error('Error joining class:', error);
-    }
+  const handleJoinClass = () => {
+    // Generate a unique session ID based on class and timestamp
+    const generatedSessionId = `${selectedClass.id}_${Date.now()}`;
+    setSessionId(generatedSessionId);
+    setIsClassActive(true);
   };
 
   // Remove authentication check - all users can access

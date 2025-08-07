@@ -93,9 +93,16 @@ export default function LiveClassroom({
 
   useEffect(() => {
     // Initialize Jitsi Meet when component mounts
-    if (jitsiContainerRef.current && window.JitsiMeetExternalAPI && !jitsiApi) {
-      initializeJitsiMeet();
-    }
+    const initJitsi = () => {
+      if (jitsiContainerRef.current && window.JitsiMeetExternalAPI && !jitsiApi) {
+        initializeJitsiMeet();
+      } else if (!window.JitsiMeetExternalAPI) {
+        // If API not loaded yet, retry after a short delay
+        setTimeout(initJitsi, 1000);
+      }
+    };
+    
+    initJitsi();
     
     return () => {
       // Cleanup when component unmounts
@@ -103,7 +110,7 @@ export default function LiveClassroom({
         jitsiApi.dispose();
       }
     };
-  }, []);
+  }, [jitsiApi]);
 
   const initializeJitsiMeet = () => {
     const domain = 'meet.jit.si';
@@ -493,18 +500,10 @@ export default function LiveClassroom({
             <DialogTitle>লাইভ চ্যাট</DialogTitle>
           </DialogHeader>
           <LiveChat 
-            messages={messages} 
-            onSendMessage={(message) => {
-              const newMessage: ChatMessage = {
-                id: Date.now().toString(),
-                userId: userId,
-                userName: userName,
-                message: message,
-                timestamp: new Date(),
-                type: 'message'
-              };
-              setMessages(prev => [...prev, newMessage]);
-            }}
+            messages={messages}
+            sessionId={sessionId}
+            userId={userId}
+            socket={null}
           />
         </DialogContent>
       </Dialog>
@@ -515,7 +514,11 @@ export default function LiveClassroom({
             <DialogHeader>
               <DialogTitle>হোমওয়ার্ক ব্যবস্থাপনা</DialogTitle>
             </DialogHeader>
-            <HomeworkSubmission sessionId={sessionId} />
+            <HomeworkSubmission 
+              sessionId={sessionId}
+              userId={userId}
+              onClose={() => setShowHomeworkDialog(false)}
+            />
           </DialogContent>
         </Dialog>
       )}
