@@ -48,8 +48,8 @@ export default function CourseRegistration() {
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
+      firstName: user?.user_metadata?.first_name || "",
+      lastName: user?.user_metadata?.last_name || "",
       email: user?.email || "",
       phone: "",
       arabicExperience: "",
