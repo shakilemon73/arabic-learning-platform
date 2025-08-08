@@ -1,6 +1,6 @@
-// Legacy auth hook - use useSupabaseAuth instead
-import { useSupabaseAuth } from "./useSupabaseAuth";
+// Simple direct Supabase authentication
+import { useSimpleAuth } from "./useSimpleAuth";
 
 export function useAuth() {
-  return useSupabaseAuth();
+  return useSimpleAuth();
 }

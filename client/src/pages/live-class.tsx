@@ -86,6 +86,27 @@ function LiveClassContent() {
     status: 'scheduled'
   };
   
+  // Check authentication first
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="font-bengali">লগইন প্রয়োজন</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4 font-bengali">
+              লাইভ ক্লাসে অংশগ্রহণ করতে দয়া করে লগইন করুন।
+            </p>
+            <Button onClick={() => navigate('/login')} className="font-bengali">
+              লগইন করুন
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // If no real class data available, show appropriate message
   if (!selectedClass && !dataLoading) {
     return (

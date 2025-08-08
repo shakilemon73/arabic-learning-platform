@@ -99,6 +99,21 @@ export default function Dashboard() {
   const enrollmentStatus = displayProfile?.enrollment_status;
   const paymentStatus = displayProfile?.payment_status;
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="mb-4 font-bengali">দয়া করে প্রথমে লগইন করুন</p>
+            <Button onClick={() => window.location.href = '/login'} className="font-bengali">
+              লগইন করুন
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />

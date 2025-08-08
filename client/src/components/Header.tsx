@@ -14,7 +14,7 @@ import {
 
 export default function Header() {
   const [location] = useLocation();
-  const { user, userProfile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   const navItems = [
     { href: "/", label: "হোম", icon: Home, active: location === "/" },
@@ -27,7 +27,7 @@ export default function Header() {
     window.location.href = "/";
   };
 
-  const displayName = userProfile?.first_name || user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'ব্যবহারকারী';
+  const displayName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'ব্যবহারকারী';
 
   return (
     <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">

@@ -1,5 +1,5 @@
-import SupabaseLogin from "@/components/SupabaseLogin";
+import SimpleLogin from "@/components/SimpleLogin";
 
 export default function LoginPage() {
-  return <SupabaseLogin />;
+  return <SimpleLogin />;
 }
