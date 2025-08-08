@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import Header from "@/components/Header";
+import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getUserAttendance, getLiveClasses } from "@/lib/api";
@@ -68,24 +69,26 @@ export default function Dashboard() {
   // Handle loading states
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-4 w-[250px]" />
-                  <Skeleton className="h-4 w-[200px]" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-[125px] w-full" />
-                </CardContent>
-              </Card>
-            ))}
+      <AuthGuard requireAuth={true}>
+        <div className="min-h-screen bg-background">
+          <Header />
+          <div className="container mx-auto px-4 py-8">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-4 w-[250px]" />
+                    <Skeleton className="h-4 w-[200px]" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-[125px] w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </AuthGuard>
     );
   }
 
@@ -97,8 +100,9 @@ export default function Dashboard() {
   const paymentStatus = displayProfile?.payment_status;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <AuthGuard requireAuth={true}>
+      <div className="min-h-screen bg-gray-50">
+        <Header />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
@@ -414,5 +418,6 @@ export default function Dashboard() {
         </Tabs>
       </div>
     </div>
+    </AuthGuard>
   );
 }

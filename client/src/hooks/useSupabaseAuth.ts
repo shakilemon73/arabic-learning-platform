@@ -130,10 +130,41 @@ export const useSupabaseAuth = () => {
           data: metadata || {}
         }
       });
+      
       if (error) {
         setError(error.message);
         return { success: false, error: error.message };
       }
+      
+      // If signup is successful and user is confirmed, create user profile
+      if (data.user && !error) {
+        try {
+          // Create user profile in the database
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              first_name: metadata?.first_name || '',
+              last_name: metadata?.last_name || '',
+              enrollment_status: 'pending',
+              payment_status: 'pending',
+              course_progress: 0,
+              classes_attended: 0,
+              certificate_score: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          
+          if (profileError) {
+            console.warn('Profile creation failed:', profileError);
+            // Don't fail the signup just because profile creation failed
+          }
+        } catch (profileErr) {
+          console.warn('Profile creation error:', profileErr);
+        }
+      }
+      
       return { success: true, data };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
