@@ -13,6 +13,9 @@ export type {
   StreamQuality 
 } from './core/VideoSDK';
 
+// Import for utility function
+import { VideoSDK, VideoSDKConfig } from './core/VideoSDK';
+
 // Event System
 export { EventEmitter } from './core/EventEmitter';
 
