@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   plugins: [
     react(),
+    runtimeErrorOverlay(),
   ],
   resolve: {
     alias: {
@@ -15,24 +17,23 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-          supabase: ['@supabase/supabase-js', '@supabase/auth-helpers-react']
-        }
-      }
-    }
   },
   server: {
     host: "0.0.0.0",
     port: 5000,
-  },
-  base: "/",
-  define: {
-    global: "globalThis",
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1", 
+      "*.replit.dev",
+      "*.replit.app",
+      "*.replit.co",
+      "3558b82d-a6c5-42dd-adf6-9d60c85355e1-00-2ts9osrsgytrb.spock.replit.dev"
+    ],
+    fs: {
+      strict: true,
+      deny: ["**/.*"],
+    },
   },
 });
