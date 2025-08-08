@@ -50,12 +50,7 @@ export default function SupabaseLogin() {
         return;
       }
 
-      // For testing - bypass authentication temporarily
-      if (signInData.email && signInData.password) {
-        console.log("🎯 Bypassing auth for testing, redirecting to dashboard...");
-        window.location.href = "/dashboard";
-        return;
-      }
+
       
       console.log("📧 Attempting login with email:", signInData.email);
       const result = await signIn(signInData.email, signInData.password);

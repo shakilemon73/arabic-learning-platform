@@ -48,20 +48,6 @@ export function getCurrentUser() {
 export async function signIn(email: string, password: string) {
   console.log('🔐 Direct authentication attempt for:', email);
   
-  // For development - allow any email/password to login
-  if (email && password) {
-    console.log('✅ Development mode - allowing any credentials');
-    const mockUser = {
-      id: 'test-user-123',
-      email: email,
-      user_metadata: { first_name: 'Test User' },
-      created_at: new Date().toISOString(),
-    };
-    currentUser = mockUser;
-    notifyListeners();
-    return { success: true, user: mockUser };
-  }
-  
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
