@@ -1,4 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -27,9 +28,7 @@ import { format } from "date-fns";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const user = null; // Authentication removed
-  const userProfile = null; // Authentication removed  
-  const authLoading = false; // Authentication removed
+  const { user, profile: userProfile, loading: authLoading } = useAuth();
 
   // Fetch real user data
   const { data: profile, isLoading: profileLoading } = useQuery({

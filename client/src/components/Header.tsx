@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { Home, BookOpen, Monitor, User, LogOut, LogIn } from "lucide-react";
-
+import { Home, BookOpen, Monitor, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 export default function Header() {
-  const [location] = useLocation();
-  const user = null; // Authentication removed
-  const signOut = () => {}; // Authentication removed
+  const [location, setLocation] = useLocation();
+  const { user, profile, signOut, loading } = useAuth();
 
   const navItems = [
     { href: "/", label: "হোম", icon: Home, active: location === "/" },
@@ -25,10 +25,12 @@ export default function Header() {
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = "/";
+    setLocation("/");
   };
 
-  const displayName = 'ব্যবহারকারী'; // Default name since auth is removed
+  // Get display name from profile or user metadata
+  const displayName = profile?.first_name || user?.user_metadata?.first_name || 'ব্যবহারকারী';
+  const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : displayName;
 
   return (
     <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
@@ -72,6 +74,9 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
+                      {profile?.avatar_url && (
+                        <AvatarImage src={profile.avatar_url} alt={fullName} />
+                      )}
                       <AvatarFallback className="bg-islamic-green text-white">
                         {displayName.charAt(0).toUpperCase()}
                       </AvatarFallback>
@@ -81,10 +86,26 @@ export default function Header() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{displayName}</p>
+                      <p className="text-sm font-medium leading-none">{fullName}</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        ব্যবহারকারী
+                        {user?.email}
                       </p>
+                      {profile && (
+                        <div className="flex items-center space-x-1 mt-1">
+                          <Badge 
+                            variant={profile.enrollment_status === 'active' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {profile.enrollment_status === 'active' ? 'সক্রিয়' : 
+                             profile.enrollment_status === 'pending' ? 'অপেক্ষমাণ' : 
+                             profile.enrollment_status === 'completed' ? 'সম্পন্ন' : 'স্থগিত'}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {profile.role === 'student' ? 'শিক্ষার্থী' : 
+                             profile.role === 'instructor' ? 'প্রশিক্ষক' : 'প্রশাসক'}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -92,6 +113,12 @@ export default function Header() {
                     <Link href="/dashboard" className="cursor-pointer">
                       <User className="mr-2 h-4 w-4" />
                       ড্যাশবোর্ড
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      প্রোফাইল
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -104,13 +131,14 @@ export default function Header() {
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    <LogIn className="mr-2 h-4 w-4" />
+                  <Button variant="ghost" size="sm" className="text-islamic-green hover:text-dark-green hover:bg-islamic-green/10">
+                    <LogIn className="w-4 h-4 mr-2" />
                     লগইন
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button size="sm" className="bg-islamic-green hover:bg-islamic-green/90">
+                  <Button size="sm" className="bg-islamic-green hover:bg-dark-green text-white">
+                    <UserPlus className="w-4 h-4 mr-2" />
                     নিবন্ধন
                   </Button>
                 </Link>
