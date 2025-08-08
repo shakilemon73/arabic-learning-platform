@@ -4,17 +4,54 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Calendar, Clock, Users, Play, Pause } from 'lucide-react';
-import LiveClassroom from '@/components/LiveClassroom';
-import { useState } from 'react';
+import { ArrowLeft, Calendar, Clock, Users, Play, Pause, MessageSquare, Video } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
+import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
+import { VideoConference } from '@/components/video-sdk/VideoConference';
+import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
+
+// Video SDK Configuration
+const VIDEO_SDK_CONFIG = {
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://sgyanvjlwlrzcrpjwlsd.supabase.co',
+  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNneWFudmpsd2xyemNycGp3bHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NTg1MjAsImV4cCI6MjA3MDEzNDUyMH0.5xjMdSUdeHGln68tfuw626q4xDZkuR8Xg_e_w6g9iJk',
+  enableAI: true,
+  enableRecording: true,
+  enableWhiteboard: true,
+  maxParticipants: 100,
+  bitrate: {
+    video: 2500,
+    audio: 128
+  }
+};
 
 export default function LiveClassPage() {
+  return (
+    <VideoSDKProvider>
+      <LiveClassContent />
+    </VideoSDKProvider>
+  );
+}
+
+function LiveClassContent() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [isClassActive, setIsClassActive] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [showChat, setShowChat] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const {
+    sdk,
+    isInitialized,
+    isConnected,
+    participants,
+    initializeSDK,
+    joinRoom,
+    leaveRoom,
+    error
+  } = useVideoSDK();
 
   // Get class ID from URL params
   const classId = new URLSearchParams(window.location.search).get('id') || 'demo-class';
@@ -32,7 +69,7 @@ export default function LiveClassPage() {
     queryFn: () => getLiveClasses(),
   });
 
-  const isLoading = classLoading || allClassesLoading;
+  const dataLoading = classLoading || allClassesLoading;
 
   // Use specific class or first available class
   const selectedClass = classData || (allClasses && allClasses[0]) || {
@@ -50,23 +87,115 @@ export default function LiveClassPage() {
 
   const isInstructor = user?.email === 'instructor@example.com'; // Check if current user is instructor
 
-  const handleJoinClass = () => {
-    // Generate a unique session ID based on class and timestamp
-    const generatedSessionId = `${selectedClass.id}_${Date.now()}`;
-    setSessionId(generatedSessionId);
-    setIsClassActive(true);
+  // Initialize SDK on mount
+  useEffect(() => {
+    initializeVideoSDK();
+  }, []);
+
+  const initializeVideoSDK = async () => {
+    try {
+      await initializeSDK(VIDEO_SDK_CONFIG);
+    } catch (err) {
+      console.error('Failed to initialize VideoSDK:', err);
+    }
   };
 
-  // Remove authentication check - all users can access
+  const handleJoinClass = async () => {
+    if (!user?.id) {
+      alert('Please login to join the class');
+      return;
+    }
 
-  if (isClassActive && sessionId) {
+    setIsLoading(true);
+    try {
+      // Create or get video room
+      const generatedRoomId = `arabic-class-${selectedClass.id}`;
+      
+      // Try to create room (will fail if exists, that's okay)
+      await createVideoRoom({
+        name: selectedClass.title_bn || selectedClass.title,
+        description: selectedClass.description_bn || selectedClass.description,
+        host_user_id: isInstructor ? user.id : (selectedClass.instructors?.email ?? 'demo-instructor'),
+        max_participants: selectedClass.max_participants || 30,
+        is_public: true
+      }).catch(() => {});
+
+      // Join the room
+      await joinRoom({
+        roomId: generatedRoomId,
+        userId: user.id,
+        userRole: isInstructor ? 'host' : 'participant',
+        displayName: user.email?.split('@')[0] || 'Student',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
+      });
+
+      setRoomId(generatedRoomId);
+      setIsClassActive(true);
+    } catch (err) {
+      console.error('Failed to join class:', err);
+      alert('Failed to join class. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLeaveClass = async () => {
+    try {
+      await leaveRoom();
+      setIsClassActive(false);
+      setRoomId(null);
+    } catch (err) {
+      console.error('Failed to leave class:', err);
+    }
+  };
+
+  // Show video conference if connected
+  if (isClassActive && isConnected) {
     return (
-      <LiveClassroom
-        sessionId={sessionId}
-        isInstructor={isInstructor}
-        classTitle={selectedClass.title_bn}
-        userId={user?.id || 'demo-user'}
-      />
+      <div className="h-screen flex flex-col bg-gray-900">
+        {/* Arabic Learning Class Header */}
+        <div className="bg-islamic-green text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="p-2 bg-white/20 rounded-lg mr-4">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold font-bengali">{selectedClass.title_bn}</h1>
+              <p className="text-sm opacity-75 font-bengali">
+                {isInstructor ? 'শিক্ষক' : 'শিক্ষার্থী'} • {participants.length + 1} জন অংশগ্রহণকারী
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+              <Clock className="w-4 h-4 mr-1" />
+              লাইভ ক্লাস
+            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLeaveClass}
+              className="bg-white/10 text-white border-white/30 hover:bg-white/20 font-bengali"
+            >
+              ক্লাস ছেড়ে দিন
+            </Button>
+          </div>
+        </div>
+
+        {/* Video Conference */}
+        <div className="flex-1">
+          <VideoConference
+            showChat={showChat}
+            onChatToggle={() => setShowChat(!showChat)}
+          />
+        </div>
+
+        {/* Class-specific bottom bar */}
+        <div className="bg-islamic-green/90 text-white px-4 py-2 text-sm text-center font-bengali">
+          আজকের বিষয়: আরবি হরফের পরিচয় ও উচ্চারণ • সময়কাল: {selectedClass.duration} মিনিট
+        </div>
+      </div>
     );
   }
 
@@ -157,26 +286,61 @@ export default function LiveClassPage() {
                   </div>
                 </div>
 
-                <div className="flex space-x-4">
+                {/* Error Display */}
+                {error && (
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 font-bengali">
+                    <strong>ত্রুটি:</strong> {error}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {/* SDK Status */}
+                  <div className="flex items-center justify-center">
+                    <Badge variant={isInitialized ? "default" : "secondary"} className="px-3 py-1">
+                      <div className={`w-2 h-2 rounded-full mr-2 ${isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                      VideoSDK: {isInitialized ? 'প্রস্তুত' : 'লোড হচ্ছে...'}
+                    </Badge>
+                  </div>
+
                   {isInstructor ? (
                     <Button
                       onClick={handleJoinClass}
+                      disabled={isLoading || !isInitialized}
                       className="flex-1 bg-white text-islamic-green hover:bg-gray-100 btn-kinetic"
                       size="lg"
                       data-testid="start-class"
                     >
-                      <Play className="w-5 h-5 mr-2" />
-                      ক্লাস শুরু করুন
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-islamic-green border-t-transparent rounded-full mr-2" />
+                          ক্লাস তৈরি হচ্ছে...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5 mr-2" />
+                          ক্লাস শুরু করুন
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <Button
                       onClick={handleJoinClass}
+                      disabled={isLoading || !isInitialized}
                       className="flex-1 bg-white text-islamic-green hover:bg-gray-100 btn-kinetic"
                       size="lg"
                       data-testid="join-class"
                     >
-                      <Users className="w-5 h-5 mr-2" />
-                      ক্লাসে যোগ দিন
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-islamic-green border-t-transparent rounded-full mr-2" />
+                          যোগ দিচ্ছেন...
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-5 h-5 mr-2" />
+                          ক্লাসে যোগ দিন
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>
@@ -194,9 +358,9 @@ export default function LiveClassPage() {
                     <span className="w-2 h-2 bg-islamic-green rounded-full"></span>
                   </div>
                   <div>
-                    <p className="font-medium mb-1">ক্যামেরা ও মাইক্রোফোন</p>
+                    <p className="font-medium mb-1">আমাদের কাস্টম ভিডিও সিস্টেম</p>
                     <p className="text-sm text-muted-foreground">
-                      ক্লাসে সক্রিয় অংশগ্রহণের জন্য ক্যামেরা ও মাইক্রোফোন চালু রাখুন
+                      উচ্চ মানের ভিডিও কল, রিয়েল-টাইম চ্যাট ও ইন্টারেক্টিভ হোয়াইটবোর্ড সহ
                     </p>
                   </div>
                 </div>
