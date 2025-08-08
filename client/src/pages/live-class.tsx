@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, Clock, Users, Play, Pause, MessageSquare, Video } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
 import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
 import { VideoConference } from '@/components/video-sdk/VideoConference';
@@ -36,7 +36,7 @@ export default function LiveClassPage() {
 
 function LiveClassContent() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const user = null; // Authentication removed
   const [isClassActive, setIsClassActive] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(true);
@@ -128,14 +128,8 @@ function LiveClassContent() {
     );
   }
 
-  // Real instructor detection based on database data - NO HARD-CODED EMAILS
-  const isInstructor = selectedClass && user ? (
-    user.user_metadata?.role === 'instructor' || 
-    (selectedClass.instructors && 
-     typeof selectedClass.instructors === 'object' && 
-     'email' in selectedClass.instructors && 
-     selectedClass.instructors.email === user.email)
-  ) : false;
+  // Real instructor detection (authentication removed, defaulting to false)
+  const isInstructor = false;
 
   // Initialize SDK on mount
   useEffect(() => {
@@ -151,12 +145,7 @@ function LiveClassContent() {
   };
 
   const handleJoinClass = async () => {
-    // Require real user authentication - no demo mode
-    if (!user?.id) {
-      alert('দয়া করে প্রথমে লগ ইন করুন। Please log in first to join the live class.');
-      navigate('/login');
-      return;
-    }
+    // Authentication removed - proceed without user check
 
     setIsLoading(true);
     try {
@@ -175,7 +164,7 @@ function LiveClassContent() {
         await createVideoRoom({
           name: selectedClass.title_bn || selectedClass.title,
           description: selectedClass.description_bn || selectedClass.description,
-          host_user_id: isInstructor ? user.id : (selectedClass.instructors as any)?.id || 'instructor-id',
+          host_user_id: 'default-instructor',
           max_participants: selectedClass.max_participants || 100,
           is_public: true,
           scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
@@ -192,10 +181,10 @@ function LiveClassContent() {
       console.log('Joining real video room with WebRTC...');
       await joinRoom({
         roomId: generatedRoomId,
-        userId: user.id,
-        userRole: isInstructor ? 'host' : 'participant',
-        displayName: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Student',
-        avatar: user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
+        userId: 'guest-user',
+        userRole: 'participant',
+        displayName: 'Guest Student',
+        avatar: `https://ui-avatars.com/api/?name=Guest&background=0D8ABC&color=fff`
       });
 
       console.log('Successfully joined real video room!');
@@ -356,7 +345,7 @@ function LiveClassContent() {
                     </div>
                     <div>
                       <p className="font-bengali font-medium">শিক্ষক</p>
-                      <p className="font-bengali opacity-75">{selectedClass.instructors?.name_bn || 'শিক্ষক'}</p>
+                      <p className="font-bengali opacity-75">শিক্ষক</p>
                     </div>
                   </div>
                 </div>

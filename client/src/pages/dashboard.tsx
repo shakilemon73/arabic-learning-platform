@@ -19,8 +19,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import Header from "@/components/Header";
-import AuthGuard from "@/components/AuthGuard";
-import { useAuth } from "@/hooks/useAuth";
+
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getUserAttendance, getLiveClasses } from "@/lib/api";
 import { Link } from "wouter";
@@ -28,7 +27,9 @@ import { format } from "date-fns";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const user = null; // Authentication removed
+  const userProfile = null; // Authentication removed  
+  const authLoading = false; // Authentication removed
 
   // Fetch real user data
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -69,26 +70,24 @@ export default function Dashboard() {
   // Handle loading states
   if (isLoading) {
     return (
-      <AuthGuard requireAuth={true}>
-        <div className="min-h-screen bg-background">
-          <Header />
-          <div className="container mx-auto px-4 py-8">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-[125px] w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-[125px] w-full" />
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </AuthGuard>
+      </div>
     );
   }
 
@@ -99,20 +98,7 @@ export default function Dashboard() {
   const enrollmentStatus = displayProfile?.enrollment_status;
   const paymentStatus = displayProfile?.payment_status;
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="mb-4 font-bengali">দয়া করে প্রথমে লগইন করুন</p>
-            <Button onClick={() => window.location.href = '/login'} className="font-bengali">
-              লগইন করুন
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Remove authentication check since auth is disabled
 
   return (
     <div className="min-h-screen bg-gray-50">

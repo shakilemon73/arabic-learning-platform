@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Home, BookOpen, Monitor, User, LogOut, LogIn } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -14,7 +14,8 @@ import {
 
 export default function Header() {
   const [location] = useLocation();
-  const { user, signOut } = useAuth();
+  const user = null; // Authentication removed
+  const signOut = () => {}; // Authentication removed
 
   const navItems = [
     { href: "/", label: "হোম", icon: Home, active: location === "/" },
@@ -27,7 +28,7 @@ export default function Header() {
     window.location.href = "/";
   };
 
-  const displayName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'ব্যবহারকারী';
+  const displayName = 'ব্যবহারকারী'; // Default name since auth is removed
 
   return (
     <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
@@ -82,7 +83,7 @@ export default function Header() {
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{displayName}</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
+                        ব্যবহারকারী
                       </p>
                     </div>
                   </DropdownMenuLabel>

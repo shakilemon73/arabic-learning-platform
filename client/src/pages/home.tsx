@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { useAuth } from "@/hooks/useAuth";
+
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getLiveClasses } from "@/lib/api";
 import { Link } from "wouter";
@@ -24,7 +24,9 @@ import { insertSampleData } from "../utils/insertSampleData";
 
 export default function Home() {
   const { toast } = useToast();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const user = null; // Authentication removed
+  const userProfile = null; // Authentication removed
+  const authLoading = false; // Authentication removed
 
   // Fetch real data
   const { data: profile, isLoading: profileLoading } = useQuery({

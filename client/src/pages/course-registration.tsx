@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,7 @@ type RegistrationFormData = z.infer<typeof registrationSchema>;
 
 
 export default function CourseRegistration() {
-  const { user } = useAuth();
+  const user = null; // Authentication removed
   const { toast } = useToast();
   const [step, setStep] = useState<'registration' | 'payment'>('registration');
   const [registeredUserId, setRegisteredUserId] = useState("");
@@ -48,9 +48,9 @@ export default function CourseRegistration() {
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
-      firstName: user?.user_metadata?.first_name || "",
-      lastName: user?.user_metadata?.last_name || "",
-      email: user?.email || "",
+      firstName: "",
+      lastName: "",
+      email: "",
       phone: "",
       arabicExperience: "",
     },

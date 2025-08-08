@@ -10,7 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
 
-import TestDashboard from "@/pages/test-dashboard";
+
 
 function Router() {
   return (
@@ -18,7 +18,7 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/home" component={Home} />
 
-      <Route path="/test-dashboard" component={TestDashboard} />
+
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/live-class" component={LiveClass} />
       <Route path="/course-registration" component={CourseRegistration} />
