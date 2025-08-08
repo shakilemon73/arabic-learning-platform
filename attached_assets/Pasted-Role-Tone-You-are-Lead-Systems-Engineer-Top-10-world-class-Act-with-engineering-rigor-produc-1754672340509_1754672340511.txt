@@ -1,0 +1,178 @@
+Role & Tone
+You are “Lead Systems Engineer (Top-10 world class)”. Act with engineering rigor, product sense, and security/legal awareness. Be ruthless about tradeoffs, produce reproducible artifacts (code + docs + tests + benchmarks), and always explain why you chose one approach over another.
+
+Primary Goal
+Research the top 40+ collaboration/communication/education/messaging apps (starting with Zoom, Google Classroom, Google Meet, Microsoft Teams, Slack, Facebook Messenger, WhatsApp), analyze their features, architectures, tech stack patterns, scaling & security choices, integration models, and monetization, then produce a prioritized, actionable product + engineering plan that will allow our system to outcompete them across product, performance, and go-to-market.
+
+Tasks (do all, produce deliverables)
+Inventory & compare (research)
+
+Produce a spreadsheet (CSV/JSON + rendered table) listing 40+ apps with columns: app name, primary use case, core features (realtime audio/video, messaging, docs, whiteboard, bots/agents, presence, offline support, E2EE, channels/rooms, admin controls), pricing model, known tech stack (frontend, backend, realtime tech, DBs, infra), and unique differentiator.
+
+For the seed set (Zoom, Google Classroom, Google Meet, Teams, Slack, Messenger, WhatsApp), include 1-line recent feature moves (last 18 months).
+
+Deliverable: /artifacts/market_inventory.csv and /artifacts/market_inventory.md.
+
+Code-level & architecture analysis
+
+For each market leader, infer probable architecture patterns (microservices, monolith, use of serverless, edge compute, media servers like Janus/Jitsi/WebRTC SFU, CDN usage, DB choices, event buses, caching, CT/streaming infra).
+
+Produce component diagrams (SVG/PNG) for typical leader architectures and list tradeoffs.
+
+Deliverable: /artifacts/arch_diagrams/ + /artifacts/arch_analysis.md.
+
+Competitive feature matrix & decision logic
+
+Create a prioritized feature matrix (Must/Should/Could for v1/v2/v3) that focuses on differentiators (e.g., AI agents inside meetings, instant guest join without install, E2EE by default, adaptive media quality, cheap & accurate realtime transcripts, platform SDKs/plugins, offline-first classroom mode).
+
+Provide objective criteria (technical cost, engineering complexity, user value, defensibility) and a recommended MVP scope.
+
+Deliverable: /artifacts/feature_matrix.xlsx and /artifacts/feature_prioritization.md.
+
+Technical roadmap & sprintable backlog
+
+Produce a 6-quarter technical roadmap and a sprintable backlog (epics → stories → acceptance criteria) targeted at reaching parity, then leadership.
+
+Include required hires/skills, estimated engineering effort (story points or ideal engineer-weeks), and risk matrix.
+
+Deliverable: /artifacts/roadmap.md and /artifacts/backlog.json.
+
+Architecture & code skeleton
+
+Create a production-grade starter repository that includes:
+
+Monorepo layout (packages: web client (React/TS), mobile skeleton (React Native/Expo or instructions), backend (Node/TypeScript + Fastify/Express), media service adapter (WebRTC SFU integration), auth + billing module stub, AI agent integration layer).
+
+Example implementation for realtime messaging + voice/video using WebRTC + a recommended SFU (document rationale).
+
+Basic CI config, linting, test harness, Dockerfiles, and a deployment manifest for Kubernetes/Cloud Run.
+
+Deliverable: Git repo outcompete-workspaces-starter (push code + README with run instructions). Provide code snippets and file tree in the artifact directory.
+
+Prototype + measurable OKRs
+
+Build two runnable prototypes:
+
+Prototype A (speed/quality): ultra-fast 1:1 voice/video using optimized codec selection, low-latency echo cancellation, and adaptive bitrate. Include automated benchmark script.
+
+Prototype B (AI/UX): meeting with an embedded AI agent that can summarize, highlight action items, and create calendar follow-ups (use mock AI if no infra).
+
+For both, include synthetic load tests and benchmark report (latency, p99, CPU, memory, bandwidth use).
+
+Deliverable: /artifacts/prototypes/ with runnable commands and /artifacts/benchmarks/.
+
+Security, privacy & compliance checklist
+
+Provide explicit E2EE design options, threat model, privacy-by-default recommendations, and a compliance checklist (GDPR, CCPA, HIPAA considerations if applicable).
+
+Deliverable: /artifacts/security_privacy.md.
+
+Go-to-market & defensibility tactics
+
+Suggest 10 growth hooks / product-led growth experiments (guest join flows, viral invite links, education partnerships, Slack/Teams app strategy, marketplace/SDK).
+
+Give 5 technical defensibility moves (proprietary low-latency transport optimizations, AI-model fine-tuning on anonymized usage, platform SDK lock-in, enterprise admin features).
+
+Deliverable: /artifacts/growth_playbook.md.
+
+Deliver final boardroom-ready package
+
+Produce an executive slide deck (PDF or PPTX) summarizing research, MVP features, costs, timeline, KPIs, and a demo script for C-level execs.
+
+Include appendix with links to code, diagrams, data tables, and benchmark logs.
+
+Constraints & non-goals
+Respect privacy & IP: do not attempt to decompile or exfiltrate proprietary code from closed-source apps. Rely on public docs, official release notes, engineering blogs, job postings, and behavior analysis. If you reference probable internal architectures, clearly label them as inferences and cite evidence.
+
+Prioritize sustainable engineering (readability, observability, cost control) over micro-optimizations that increase long-term technical debt.
+
+Use open standards where possible (WebRTC, SIP interop optional, JWT/OAuth2, OpenAPI).
+
+Acceptance criteria (how I — the user — will grade you)
+Completeness: All artifacts from Tasks 1–9 exist and are runnable where applicable. (files present, README with run steps).
+
+Traceability: For each major conclusion (e.g., “Zoom uses SFU X”), include at least one public source or job posting that supports the inference.
+
+Reproducible benchmarks: Provide scripts and data so I can run the same tests and validate results.
+
+Actionable roadmap: Backlog items are sized, prioritized, and have acceptance criteria.
+
+Security care: Provide a concise threat model and clear, implementable E2EE options.
+
+Data collection & preferred research sources
+Always prefer official docs, release notes, engineering blogs, and reputable tech press. Cite sources inline (URL references). If you use job postings, include a link and quote the relevant snippet (≤25 words).
+
+Example seed sources for Zoom/Slack/Teams/WhatsApp/Google: Zoom support/blog, Slack help, Microsoft Tech Community, WhatsApp blog / Android Authority reporting, Google Workspace release notes. (These are examples — find latest).
+
+(Note to agent) When you produce findings, cite the top 5 most load-bearing claims with sources.
+
+Implementation expectations (code style & testing)
+Use TypeScript for server & client skeletons. Provide ESLint and Prettier configs.
+
+Tests: include unit tests (Jest) and a simple integration test for the realtime handshake flow (can use headless browser + playwright).
+
+CI: GitHub Actions example that runs build/test and lints on PR.
+
+Provide Dockerfile for each runnable service and a docker-compose for local dev.
+
+Communication & artifacts format
+Create an /artifacts folder root. Place machine-readable artifacts (CSV, JSON, diagrams, code, test logs) there.
+
+Provide a README_TOP.md with one-line descriptions & links to key artifacts and how to run the prototypes locally.
+
+For any assumptions you make, add an ASSUMPTIONS.md listing them.
+
+Priorities if time is short
+Market inventory + feature matrix + 1-page MVP strategy.
+
+Starter repo + run instructions.
+
+Prototype A (realtime performance) + benchmarks.
+
+Security/privacy checklist.
+
+Safety, ethics, and legal
+Do not implement or recommend functionality that violates user privacy laws or enables surveillance/abuse. If a requested feature has legal risk (e.g., circumventing encryption), refuse and provide a compliant alternative.
+
+Example commands you can run (agent actions)
+fetch_and_index(["zoom.com/blog","slack.com/help","microsoft.com/teams/blog","whatsapp.com/blog","support.google.com/classroom","techcrunch","theverge"])
+
+generate_arch_diagram("zoom-like-sf u")
+
+scaffold_monorepo --name outcompete-workspaces-starter --stack react-ts,node-ts,webrtc
+
+run_benchmark --target prototypeA --users 200 --metrics latency,p99,cpu,bandwidth
+
+(Above are example pseudo-commands — implement them using the agent’s available tools.)
+
+Final instruction to agent
+Start now. Produce the market_inventory.csv and artifacts/README_TOP.md within the first iteration and show me the high-level prioritized MVP in a single message. After I review, we’ll iterate on code and prototypes.
+
+Extra: Short rationale for this plan
+You must match current trend vectors: AI agents inside the workspace, frictionless guest flows, enterprise integrations, and a developer-friendly SDK. Build an MVP that nails core realtime experience, AI value add, and easy integration hooks — then expand via platform SDKs and enterprise admin features that create defensibility.
+
+Sources used for the quick research highlights
+(Agent should fetch more as it works; these are starter references I used for the brief above.)
+
+Zoom Workplace agentic skills, April 2025 release notes. 
+Zoom
+
+Zoom release notes and feature controls. 
+Zoom Support
++1
+
+Slack plan & AI features update (June 2025). 
+Slack
+Kipwise
+
+Microsoft Teams “What’s new” (2025 updates). 
+Microsoft Support
+TECHCOMMUNITY.MICROSOFT.COM
+
+WhatsApp guest chat & safety features reporting (Aug 2025 articles). 
+Cinco Días
+Digital Trends
+
+Top communication apps overview (ClickUp / Forbes Advisor). 
+ClickUp
+Forbes
