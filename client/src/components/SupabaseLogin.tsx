@@ -60,8 +60,8 @@ export default function SupabaseLogin() {
           description: "আপনি সফলভাবে লগইন করেছেন",
         });
         console.log("🎯 Redirecting to dashboard...");
-        // Use navigate instead of window.location.href for better UX
-        setTimeout(() => navigate("/dashboard"), 500);
+        // Force immediate navigation to dashboard
+        window.location.href = "/dashboard";
       } else {
         const errorMsg = result.error || "অজানা ত্রুটি হয়েছে";
         console.error("❌ Login failed:", errorMsg);

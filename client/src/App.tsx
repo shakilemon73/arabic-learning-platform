@@ -11,6 +11,8 @@ import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
+import TestLogin from "@/components/TestLogin";
+import TestDashboard from "@/pages/test-dashboard";
 
 function Router() {
   return (
@@ -19,6 +21,8 @@ function Router() {
       <Route path="/home" component={Home} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/test-login" component={TestLogin} />
+      <Route path="/test-dashboard" component={TestDashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/live-class" component={LiveClass} />
       <Route path="/course-registration" component={CourseRegistration} />
