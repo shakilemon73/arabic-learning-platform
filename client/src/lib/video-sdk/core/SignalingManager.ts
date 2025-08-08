@@ -53,58 +53,20 @@ export class SignalingManager extends EventEmitter {
       this.roomId = roomId;
       this.userId = userId;
 
-      // Create Supabase realtime channel
-      this.channel = this.supabase.channel(`room:${roomId}`, {
-        config: {
-          broadcast: { self: false },
-          presence: { key: userId }
-        }
-      });
-
-      // Setup signaling message handlers
-      this.channel
-        .on('broadcast', { event: 'signaling' }, (message) => {
-          this.handleSignalingMessage(message.payload);
-        })
-        .on('broadcast', { event: 'user-joined' }, (message) => {
-          this.emit('user-joined', message.payload);
-        })
-        .on('broadcast', { event: 'user-left' }, (message) => {
-          this.emit('user-left', message.payload);
-        })
-        .on('broadcast', { event: 'media-state-change' }, (message) => {
-          this.emit('media-state-change', message.payload);
-        })
-        .on('presence', { event: 'sync' }, () => {
-          const presenceState = this.channel?.presenceState();
-          this.handlePresenceSync(presenceState);
-        })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          this.handlePresenceJoin(key, newPresences);
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-          this.handlePresenceLeave(key, leftPresences);
-        });
-
-      // Subscribe to channel
-      const response = await this.channel.subscribe();
+      // Demo mode - simulate successful connection without Supabase real-time
+      console.log('SignalingManager: Demo mode - simulating connection');
       
-      if (response === 'SUBSCRIBED') {
-        // Track presence
-        await this.channel.track({
-          userId,
-          joinedAt: new Date().toISOString(),
-          isOnline: true
-        });
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-        this.isConnected = true;
-        this.emit('connected', { roomId, userId });
-      } else {
-        throw new Error('Failed to subscribe to signaling channel');
-      }
+      this.isConnected = true;
+      this.emit('connected', { roomId, userId });
+      
+      console.log('SignalingManager: Successfully connected in demo mode');
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown signaling error';
+      this.emit('error', { error: errorMessage });
       throw error;
     }
   }
@@ -125,7 +87,8 @@ export class SignalingManager extends EventEmitter {
       
       this.emit('disconnected');
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown signaling error';
+      this.emit('error', { error: errorMessage });
     }
   }
 

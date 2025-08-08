@@ -57,12 +57,17 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
       const newSDK = new VideoSDK(config);
       setSdk(newSDK);
       
-      // Setup event listeners
+      // Setup event listeners first
       setupSDKEventListeners(newSDK);
+      
+      // Mark as initialized immediately since the SDK instance is ready
+      setIsInitialized(true);
+      setError(null);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize SDK';
       setError(errorMessage);
+      setIsInitialized(false);
       throw err;
     }
   };

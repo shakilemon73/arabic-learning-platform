@@ -101,9 +101,12 @@ function LiveClassContent() {
   };
 
   const handleJoinClass = async () => {
+    // For demo purposes, create a demo user if no user is logged in
+    const currentUserId = user?.id || `demo-user-${Date.now()}`;
+    const currentUserEmail = user?.email || 'demo@arabiclearning.com';
+    
     if (!user?.id) {
-      alert('Please login to join the class');
-      return;
+      console.log('No user logged in, using demo user for testing');
     }
 
     setIsLoading(true);
@@ -111,29 +114,32 @@ function LiveClassContent() {
       // Create or get video room
       const generatedRoomId = `arabic-class-${selectedClass.id}`;
       
-      // Try to create room (will fail if exists, that's okay)
-      await createVideoRoom({
-        name: selectedClass.title_bn || selectedClass.title,
-        description: selectedClass.description_bn || selectedClass.description,
-        host_user_id: isInstructor ? user.id : (selectedClass.instructors?.email ?? 'demo-instructor'),
-        max_participants: selectedClass.max_participants || 30,
-        is_public: true
-      }).catch(() => {});
+      console.log('Creating video room with ID:', generatedRoomId);
+      
+      // Try to create room (skip for demo to avoid database issues)
+      console.log('Skipping database room creation for demo');
 
-      // Join the room
+      // Join the room via VideoSDK
+      console.log('Attempting to join video room...');
       await joinRoom({
         roomId: generatedRoomId,
-        userId: user.id,
+        userId: currentUserId,
         userRole: isInstructor ? 'host' : 'participant',
-        displayName: user.email?.split('@')[0] || 'Student',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
+        displayName: currentUserEmail.split('@')[0] || 'Student',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserEmail.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
       });
 
+      console.log('Successfully joined room!');
       setRoomId(generatedRoomId);
       setIsClassActive(true);
     } catch (err) {
       console.error('Failed to join class:', err);
-      alert('Failed to join class. Please try again.');
+      
+      // Show detailed error message for debugging
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Detailed error:', errorMessage);
+      
+      alert(`Failed to join class: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

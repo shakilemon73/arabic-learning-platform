@@ -56,7 +56,8 @@ export class MediaManager extends EventEmitter {
       
       this.emit('initialized');
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
       throw error;
     }
   }
@@ -88,7 +89,8 @@ export class MediaManager extends EventEmitter {
       this.emit('stream-acquired', { stream });
       return stream;
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
       throw error;
     }
   }
@@ -154,7 +156,8 @@ export class MediaManager extends EventEmitter {
       
       return null;
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
       return null;
     }
   }
@@ -188,7 +191,8 @@ export class MediaManager extends EventEmitter {
       
       return null;
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
       return null;
     }
   }
@@ -233,7 +237,8 @@ export class MediaManager extends EventEmitter {
         this.emit('speaker-switched', { deviceId });
       }
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
     }
   }
 
@@ -251,7 +256,8 @@ export class MediaManager extends EventEmitter {
 
       this.emit('devices-updated', { devices: this.availableDevices });
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.emit('error', { error: errorMessage });
     }
   }
 
