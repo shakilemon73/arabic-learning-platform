@@ -1,4 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -24,11 +25,9 @@ import { insertSampleData } from "../utils/insertSampleData";
 
 export default function Home() {
   const { toast } = useToast();
-  const user = null; // Authentication removed
-  const userProfile = null; // Authentication removed
-  const authLoading = false; // Authentication removed
+  const { user, profile: userProfile, loading: authLoading } = useAuth();
 
-  // Fetch real data
+  // Fetch real data - use profile from AuthContext primarily
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['/api/user-profile', user?.id],
     queryFn: () => getUserProfile(user!.id),
@@ -42,8 +41,8 @@ export default function Home() {
 
   const isLoading = authLoading || profileLoading || classesLoading;
 
-  // Use real data or fallbacks
-  const displayProfile = profile || userProfile || {
+  // Use real data from AuthContext primarily
+  const displayProfile = userProfile || profile || {
     enrollment_status: "pending",
     course_progress: 0,
     classes_attended: 0,
@@ -52,10 +51,7 @@ export default function Home() {
     last_name: ""
   };
 
-  const displayUser = user || { 
-    email: "user@example.com",
-    user_metadata: { first_name: "ব্যবহারকারী", last_name: "" }
-  };
+  const displayUser = user;
 
   // Insert sample data when button is clicked (for testing)
   const handleInsertSampleData = async () => {

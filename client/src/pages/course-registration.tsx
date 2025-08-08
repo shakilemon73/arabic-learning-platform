@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Shield, 
   CheckCircle, 
@@ -40,7 +41,7 @@ type RegistrationFormData = z.infer<typeof registrationSchema>;
 
 
 export default function CourseRegistration() {
-  const user = null; // Authentication removed
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState<'registration' | 'payment'>('registration');
   const [registeredUserId, setRegisteredUserId] = useState("");

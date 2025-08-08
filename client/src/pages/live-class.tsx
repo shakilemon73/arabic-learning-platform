@@ -1,11 +1,13 @@
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, Clock, Users, Play, Pause, MessageSquare, Video } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import Header from '@/components/Header';
 
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
 import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
@@ -36,7 +38,7 @@ export default function LiveClassPage() {
 
 function LiveClassContent() {
   const [, navigate] = useLocation();
-  const user = null; // Authentication removed
+  const { user, profile, loading: authLoading } = useAuth();
   const [isClassActive, setIsClassActive] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(true);
@@ -86,23 +88,43 @@ function LiveClassContent() {
     status: 'scheduled'
   };
   
-  // Check authentication first
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mx-auto"></div>
+              <p className="text-muted-foreground font-bengali">লাইভ ক্লাস লোড হচ্ছে...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check authentication - this should now work correctly with AuthGuard
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="font-bengali">লগইন প্রয়োজন</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground mb-4 font-bengali">
-              লাইভ ক্লাসে অংশগ্রহণ করতে দয়া করে লগইন করুন।
-            </p>
-            <Button onClick={() => navigate('/login')} className="font-bengali">
-              লগইন করুন
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="font-bengali">লগইন প্রয়োজন</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-muted-foreground mb-4 font-bengali">
+                লাইভ ক্লাসে অংশগ্রহণ করতে দয়া করে লগইন করুন।
+              </p>
+              <Button onClick={() => navigate('/login')} className="font-bengali">
+                লগইন করুন
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -128,8 +150,8 @@ function LiveClassContent() {
     );
   }
 
-  // Real instructor detection (authentication removed, defaulting to false)
-  const isInstructor = false;
+  // Real instructor detection based on user profile
+  const isInstructor = profile?.role === 'instructor' || profile?.role === 'admin';
 
   // Initialize SDK on mount
   useEffect(() => {
@@ -145,7 +167,10 @@ function LiveClassContent() {
   };
 
   const handleJoinClass = async () => {
-    // Authentication removed - proceed without user check
+    if (!user || !profile) {
+      console.error('User authentication required');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -164,7 +189,7 @@ function LiveClassContent() {
         await createVideoRoom({
           name: selectedClass.title_bn || selectedClass.title,
           description: selectedClass.description_bn || selectedClass.description,
-          host_user_id: 'default-instructor',
+          host_user_id: user.id || 'default-user',
           max_participants: selectedClass.max_participants || 100,
           is_public: true,
           scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
@@ -181,10 +206,10 @@ function LiveClassContent() {
       console.log('Joining real video room with WebRTC...');
       await joinRoom({
         roomId: generatedRoomId,
-        userId: 'guest-user',
-        userRole: 'participant',
-        displayName: 'Guest Student',
-        avatar: `https://ui-avatars.com/api/?name=Guest&background=0D8ABC&color=fff`
+        userId: user.id,
+        userRole: isInstructor ? 'instructor' : 'participant',
+        displayName: profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email?.split('@')[0] || 'User',
+        avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.first_name || 'User')}&background=0D8ABC&color=fff`
       });
 
       console.log('Successfully joined real video room!');
