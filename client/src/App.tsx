@@ -9,7 +9,7 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
-import LiveClassDemo from "@/pages/live-class-demo";
+
 
 function Router() {
   return (
@@ -18,7 +18,7 @@ function Router() {
       <Route path="/home" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/live-class" component={LiveClass} />
-      <Route path="/live-class-demo" component={LiveClassDemo} />
+
       <Route path="/course-registration" component={CourseRegistration} />
       
       {/* Fallback to 404 */}

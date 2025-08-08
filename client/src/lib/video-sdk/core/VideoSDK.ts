@@ -175,7 +175,7 @@ export class VideoSDK extends EventEmitter {
       },
       translationConfig: {
         languages: ['en', 'ar', 'es', 'fr', 'de', 'zh', 'ja', 'hi', 'bn'],
-        provider: 'kudo',
+        provider: 'kudo' as 'kudo',
         voiceToVoice: true
       },
       metaverseConfig: {
@@ -184,8 +184,8 @@ export class VideoSDK extends EventEmitter {
         environments: ['cairo-classroom', 'damascus-library', 'mecca-study-circle']
       },
       arabicLearningConfig: {
-        dialect: 'MSA',
-        focus: 'quranic',
+        dialect: 'MSA' as 'MSA',
+        focus: 'quranic' as 'quranic',
         pronunciationCoaching: true,
         tajweedAnalysis: true
       },

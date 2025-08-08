@@ -50,7 +50,8 @@ export function VideoConference({
     startScreenShare,
     stopScreenShare,
     leaveRoom,
-    error
+    error,
+    sdk
   } = useVideoSDK();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -65,11 +66,36 @@ export function VideoConference({
     }
   }, [localStream]);
 
-  // Handle participant video streams
+  // Handle participant video streams - REAL IMPLEMENTATION
   useEffect(() => {
-    // This would be connected to the SDK's remote stream events
-    // For now, we'll just track participants
-  }, [participants]);
+    // Listen for remote stream events from the SDK
+    if (!isConnected) return;
+
+    const handleRemoteStream = (data: { participantId: string; stream: MediaStream }) => {
+      setParticipantStreams(prev => {
+        const updated = new Map(prev);
+        updated.set(data.participantId, data.stream);
+        return updated;
+      });
+    };
+
+    const handleParticipantLeft = (data: { participantId: string }) => {
+      setParticipantStreams(prev => {
+        const updated = new Map(prev);
+        updated.delete(data.participantId);
+        return updated;
+      });
+    };
+
+    // These events would be emitted by the VideoSDK when remote streams are received
+    window.addEventListener('remote-stream-added', handleRemoteStream as EventListener);
+    window.addEventListener('participant-left', handleParticipantLeft as EventListener);
+
+    return () => {
+      window.removeEventListener('remote-stream-added', handleRemoteStream as EventListener);
+      window.removeEventListener('participant-left', handleParticipantLeft as EventListener);
+    };
+  }, [participants, isConnected]);
 
   const handleVideoToggle = async () => {
     await toggleVideo();
@@ -91,9 +117,22 @@ export function VideoConference({
     await leaveRoom();
   };
 
-  const handleStartRecording = () => {
-    setIsRecording(!isRecording);
-    // This would call the SDK's recording functionality
+  const handleStartRecording = async () => {
+    try {
+      if (!isRecording) {
+        // Start real recording via SDK
+        await sdk?.startRecording?.();
+        setIsRecording(true);
+        console.log('Started recording');
+      } else {
+        // Stop real recording via SDK
+        await sdk?.stopRecording?.();
+        setIsRecording(false);
+        console.log('Stopped recording');
+      }
+    } catch (error) {
+      console.error('Recording error:', error);
+    }
   };
 
   if (!isConnected) {

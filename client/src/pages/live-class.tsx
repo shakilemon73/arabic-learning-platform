@@ -71,21 +71,38 @@ function LiveClassContent() {
 
   const dataLoading = classLoading || allClassesLoading;
 
-  // Use specific class or first available class
-  const selectedClass = classData || (allClasses && allClasses[0]) || {
-    id: 'demo-class',
-    title: 'আরবি ভাষা শিক্ষা',
-    title_bn: 'আরবি ভাষা শিক্ষা - ডেমো ক্লাস',
-    description: 'আরবি ভাষা শিক্ষার মৌলিক বিষয়সমূহ',
-    description_bn: 'আরবি ভাষা শিক্ষার মৌলিক বিষয়সমূহ',
-    scheduled_at: new Date().toISOString(),
-    duration: 90,
-    max_participants: 30,
-    current_participants: 5,
-    instructors: { name: 'উস্তাদ', name_bn: 'উস্তাদ আহমেদ', email: 'instructor@example.com' }
-  };
+  // Use specific class data - NO FALLBACK TO DEMO DATA
+  const selectedClass = classData || (allClasses && allClasses[0]);
+  
+  // If no real class data available, show appropriate message
+  if (!selectedClass && !dataLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="font-bengali">কোন লাইভ ক্লাস পাওয়া যায়নি</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4 font-bengali">
+              এই মুহূর্তে কোন লাইভ ক্লাস উপলব্ধ নেই।
+            </p>
+            <Button onClick={() => navigate('/dashboard')} className="font-bengali">
+              ড্যাশবোর্ডে ফিরে যান
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const isInstructor = user?.email === 'instructor@example.com'; // Check if current user is instructor
+  // Real instructor detection based on database data - NO HARD-CODED EMAILS
+  const isInstructor = selectedClass && user ? (
+    user.user_metadata?.role === 'instructor' || 
+    (selectedClass.instructors && 
+     typeof selectedClass.instructors === 'object' && 
+     'email' in selectedClass.instructors && 
+     selectedClass.instructors.email === user.email)
+  ) : false;
 
   // Initialize SDK on mount
   useEffect(() => {
@@ -101,35 +118,54 @@ function LiveClassContent() {
   };
 
   const handleJoinClass = async () => {
-    // For demo purposes, create a demo user if no user is logged in
-    const currentUserId = user?.id || `demo-user-${Date.now()}`;
-    const currentUserEmail = user?.email || 'demo@arabiclearning.com';
-    
+    // Require real user authentication - no demo mode
     if (!user?.id) {
-      console.log('No user logged in, using demo user for testing');
+      alert('দয়া করে প্রথমে লগ ইন করুন। Please log in first to join the live class.');
+      navigate('/login');
+      return;
     }
 
     setIsLoading(true);
     try {
-      // Create or get video room
+      // Ensure selectedClass exists
+      if (!selectedClass) {
+        throw new Error('No class data available');
+      }
+      
+      // Create or get video room - REAL FUNCTIONALITY
       const generatedRoomId = `arabic-class-${selectedClass.id}`;
       
-      console.log('Creating video room with ID:', generatedRoomId);
+      console.log('Creating real video room with ID:', generatedRoomId);
       
-      // Try to create room (skip for demo to avoid database issues)
-      console.log('Skipping database room creation for demo');
+      // Create room in database - REAL DATABASE OPERATIONS
+      try {
+        await createVideoRoom({
+          name: selectedClass.title_bn || selectedClass.title,
+          description: selectedClass.description_bn || selectedClass.description,
+          host_user_id: isInstructor ? user.id : (selectedClass.instructors as any)?.id || 'instructor-id',
+          max_participants: selectedClass.max_participants || 100,
+          is_public: true,
+          scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
+          scheduled_end_time: selectedClass.scheduled_at && selectedClass.duration ? 
+            new Date(new Date(selectedClass.scheduled_at).getTime() + (selectedClass.duration * 60 * 1000)) :
+            new Date(Date.now() + 90 * 60 * 1000)
+        });
+        console.log('Successfully created room in database');
+      } catch (dbError) {
+        console.log('Room may already exist, proceeding to join:', dbError);
+      }
 
-      // Join the room via VideoSDK
-      console.log('Attempting to join video room...');
+      // Join the room via VideoSDK - REAL VIDEO CONNECTION
+      console.log('Joining real video room with WebRTC...');
       await joinRoom({
         roomId: generatedRoomId,
-        userId: currentUserId,
+        userId: user.id,
         userRole: isInstructor ? 'host' : 'participant',
-        displayName: currentUserEmail.split('@')[0] || 'Student',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserEmail.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
+        displayName: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Student',
+        avatar: user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}&background=0D8ABC&color=fff`
       });
 
-      console.log('Successfully joined room!');
+      console.log('Successfully joined real video room!');
       setRoomId(generatedRoomId);
       setIsClassActive(true);
     } catch (err) {
@@ -139,7 +175,7 @@ function LiveClassContent() {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       console.error('Detailed error:', errorMessage);
       
-      alert(`Failed to join class: ${errorMessage}`);
+      alert(`ক্লাসে যোগদানে ব্যর্থ / Failed to join class: ${errorMessage}. Please check your internet connection and camera/microphone permissions.`);
     } finally {
       setIsLoading(false);
     }
@@ -166,7 +202,7 @@ function LiveClassContent() {
               <Video className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold font-bengali">{selectedClass.title_bn}</h1>
+              <h1 className="text-xl font-semibold font-bengali">{selectedClass?.title_bn || selectedClass?.title || 'লাইভ ক্লাস'}</h1>
               <p className="text-sm opacity-75 font-bengali">
                 {isInstructor ? 'শিক্ষক' : 'শিক্ষার্থী'} • {participants.length + 1} জন অংশগ্রহণকারী
               </p>
