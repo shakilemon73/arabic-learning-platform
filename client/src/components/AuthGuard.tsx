@@ -12,13 +12,17 @@ export default function AuthGuard({ children, requireAuth = false }: AuthGuardPr
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
 
+  console.log("🛡️ AuthGuard check:", { user: !!user, loading, requireAuth });
+
   useEffect(() => {
     if (!loading && requireAuth && !user) {
+      console.log("🔒 Redirecting to login - no authenticated user");
       setLocation('/login');
     }
   }, [loading, requireAuth, user, setLocation]);
 
   if (loading) {
+    console.log("⏳ AuthGuard: Still loading authentication...");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="space-y-4">
@@ -31,8 +35,10 @@ export default function AuthGuard({ children, requireAuth = false }: AuthGuardPr
   }
 
   if (requireAuth && !user) {
+    console.log("🚫 AuthGuard: No user, blocking access");
     return null; // Will redirect to login
   }
 
+  console.log("✅ AuthGuard: Access granted");
   return <>{children}</>;
 }

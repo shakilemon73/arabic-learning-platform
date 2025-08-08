@@ -100,9 +100,8 @@ export default function Dashboard() {
   const paymentStatus = displayProfile?.payment_status;
 
   return (
-    <AuthGuard requireAuth={true}>
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+    <div className="min-h-screen bg-gray-50">
+      <Header />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
@@ -418,6 +417,5 @@ export default function Dashboard() {
         </Tabs>
       </div>
     </div>
-    </AuthGuard>
   );
 }

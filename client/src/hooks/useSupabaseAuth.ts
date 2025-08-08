@@ -101,19 +101,36 @@ export const useSupabaseAuth = () => {
 
   const signIn = async (email: string, password: string) => {
     setError(null);
+    console.log("🔐 Starting Supabase signIn...");
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      console.log("🔐 Supabase response:", { 
+        hasUser: !!data?.user, 
+        hasSession: !!data?.session,
+        error: error?.message 
+      });
+      
       if (error) {
+        console.error("❌ Supabase signIn error:", error.message);
         setError(error.message);
         return { success: false, error: error.message };
       }
-      return { success: true, data };
+      
+      if (data?.user && data?.session) {
+        console.log("✅ Sign in successful, user authenticated");
+        return { success: true, data };
+      } else {
+        console.error("❌ No user or session returned");
+        return { success: false, error: "No user session created" };
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error("💥 Sign in exception:", err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
