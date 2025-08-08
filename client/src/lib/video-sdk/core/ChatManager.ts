@@ -93,7 +93,7 @@ export class ChatManager extends EventEmitter {
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
-          table: 'chat_messages',
+          table: 'video_chat_messages',
           filter: `room_id=eq.${roomId}`
         }, (payload) => {
           this.handleNewMessage(payload.new as any);
@@ -101,7 +101,7 @@ export class ChatManager extends EventEmitter {
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
-          table: 'chat_messages',
+          table: 'video_chat_messages',
           filter: `room_id=eq.${roomId}`
         }, (payload) => {
           this.handleMessageUpdate(payload.new as any);
@@ -109,7 +109,7 @@ export class ChatManager extends EventEmitter {
         .on('postgres_changes', {
           event: 'DELETE',
           schema: 'public',
-          table: 'chat_messages',
+          table: 'video_chat_messages',
           filter: `room_id=eq.${roomId}`
         }, (payload) => {
           this.handleMessageDelete(payload.old as any);
@@ -131,7 +131,8 @@ export class ChatManager extends EventEmitter {
       this.emit('chat-initialized', { roomId, userId });
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
       throw error;
     }
   }
@@ -153,7 +154,7 @@ export class ChatManager extends EventEmitter {
 
       // Insert message into database
       const { error } = await this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .insert({
           room_id: data.roomId,
           user_id: data.userId,
@@ -172,7 +173,8 @@ export class ChatManager extends EventEmitter {
       }
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 
@@ -191,7 +193,7 @@ export class ChatManager extends EventEmitter {
       }
 
       const { error } = await this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .update({
           message: newMessage,
           is_edited: true,
@@ -205,7 +207,8 @@ export class ChatManager extends EventEmitter {
       }
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 
@@ -215,7 +218,7 @@ export class ChatManager extends EventEmitter {
   async deleteMessage(messageId: string): Promise<void> {
     try {
       const { error } = await this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .update({
           is_deleted: true,
           message: '[Message deleted]',
@@ -229,7 +232,8 @@ export class ChatManager extends EventEmitter {
       }
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 
@@ -280,7 +284,8 @@ export class ChatManager extends EventEmitter {
       });
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 
@@ -303,7 +308,8 @@ export class ChatManager extends EventEmitter {
       });
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 
@@ -339,7 +345,8 @@ export class ChatManager extends EventEmitter {
       return data.publicUrl;
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
       return null;
     }
   }
@@ -350,7 +357,7 @@ export class ChatManager extends EventEmitter {
   async getChatHistory(limit: number = 50, before?: Date): Promise<ChatMessage[]> {
     try {
       let query = this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .select(`
           *,
           reactions:chat_reactions(*)
@@ -373,7 +380,8 @@ export class ChatManager extends EventEmitter {
       return (data || []).map(this.transformDatabaseMessage).reverse();
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
       return [];
     }
   }
@@ -384,7 +392,7 @@ export class ChatManager extends EventEmitter {
   async searchMessages(query: string, limit: number = 20): Promise<ChatMessage[]> {
     try {
       const { data, error } = await this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .select('*')
         .eq('room_id', this.roomId)
         .eq('is_deleted', false)
@@ -399,7 +407,8 @@ export class ChatManager extends EventEmitter {
       return (data || []).map(this.transformDatabaseMessage);
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
       return [];
     }
   }
@@ -410,7 +419,7 @@ export class ChatManager extends EventEmitter {
   async clearChatHistory(): Promise<void> {
     try {
       const { error } = await this.supabase
-        .from('chat_messages')
+        .from('video_chat_messages')
         .delete()
         .eq('room_id', this.roomId);
 
@@ -422,7 +431,8 @@ export class ChatManager extends EventEmitter {
       this.emit('chat-cleared');
 
     } catch (error) {
-      this.emit('error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('error', { error: errorMsg });
     }
   }
 

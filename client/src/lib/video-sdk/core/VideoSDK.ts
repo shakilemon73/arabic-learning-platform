@@ -84,15 +84,15 @@ export class VideoSDK extends EventEmitter {
   private isConnected = false;
 
   // Core managers
-  private mediaManager: MediaManager;
-  private signalingManager: SignalingManager;
-  private peerConnectionManager: PeerConnectionManager;
-  private chatManager: ChatManager;
-  private screenShareManager: ScreenShareManager;
-  private whiteboardManager: WhiteboardManager;
-  private recordingManager: RecordingManager;
-  private moderatorManager: ModeratorManager;
-  private streamQualityManager: StreamQualityManager;
+  private mediaManager!: MediaManager;
+  private signalingManager!: SignalingManager;
+  private peerConnectionManager!: PeerConnectionManager;
+  private chatManager!: ChatManager;
+  private screenShareManager!: ScreenShareManager;
+  private whiteboardManager!: WhiteboardManager;
+  private recordingManager!: RecordingManager;
+  private moderatorManager!: ModeratorManager;
+  private streamQualityManager!: StreamQualityManager;
 
   // State management
   private localStream: MediaStream | null = null;
@@ -180,7 +180,8 @@ export class VideoSDK extends EventEmitter {
       this.emit('sdk-initialized', { sessionConfig });
       
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
       throw error;
     }
   }
@@ -228,7 +229,8 @@ export class VideoSDK extends EventEmitter {
       });
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
       throw error;
     }
   }
@@ -275,7 +277,8 @@ export class VideoSDK extends EventEmitter {
       this.emit('room-left', { roomId: this.session.roomId });
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -295,7 +298,8 @@ export class VideoSDK extends EventEmitter {
       return isEnabled;
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
       return false;
     }
   }
@@ -316,7 +320,8 @@ export class VideoSDK extends EventEmitter {
       return isEnabled;
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
       return false;
     }
   }
@@ -343,7 +348,8 @@ export class VideoSDK extends EventEmitter {
       return screenStream;
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
       return null;
     }
   }
@@ -371,7 +377,8 @@ export class VideoSDK extends EventEmitter {
       this.emit('screen-share-stopped');
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -393,7 +400,8 @@ export class VideoSDK extends EventEmitter {
       });
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -413,13 +421,19 @@ export class VideoSDK extends EventEmitter {
 
       await this.recordingManager.startRecording({
         roomId: this.session.roomId,
-        initiatedBy: this.session.userId
+        initiatedBy: this.session.userId,
+        recordVideo: true,
+        recordAudio: true,
+        recordScreen: false,
+        quality: 'medium' as const,
+        format: 'mp4'
       });
 
       this.emit('recording-started');
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -436,7 +450,8 @@ export class VideoSDK extends EventEmitter {
       this.emit('recording-stopped');
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -453,7 +468,8 @@ export class VideoSDK extends EventEmitter {
       this.emit('stream-quality-changed', { quality });
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -475,13 +491,15 @@ export class VideoSDK extends EventEmitter {
         roomId: this.session.roomId,
         moderatorId: this.session.userId,
         participantId,
-        mediaType
+        mediaType,
+        action: 'mute'
       });
 
       this.emit('participant-muted', { participantId, mediaType });
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 
@@ -634,7 +652,8 @@ export class VideoSDK extends EventEmitter {
       this.session = null;
 
     } catch (error) {
-      this.emit('sdk-error', { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      this.emit('sdk-error', { error: errorMsg });
     }
   }
 }
