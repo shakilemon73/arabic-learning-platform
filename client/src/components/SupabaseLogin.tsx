@@ -4,17 +4,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
+import { Loader2 } from "lucide-react";
 
 export default function SupabaseLogin() {
-  const { signIn, signUp } = useSupabaseAuth();
+  const { signIn, signUp } = useAuth();
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [, navigate] = useLocation();
   
   // Determine default tab based on current route
-  const defaultTab = location === '/register' ? 'signup' : 'signin';
+  const defaultTab = window.location.pathname === '/register' ? 'signup' : 'signin';
+  
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: "",
@@ -31,80 +35,130 @@ export default function SupabaseLogin() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSigningIn(true);
     
-    if (!signInData.email || !signInData.password) {
-      toast({
-        title: "ত্রুটি",
-        description: "ইমেইল এবং পাসওয়ার্ড প্রয়োজন",
-        variant: "destructive",
-      });
-      return;
-    }
+    try {
+      console.log("🔐 Starting login process...");
+      
+      if (!signInData.email || !signInData.password) {
+        toast({
+          title: "ত্রুটি",
+          description: "ইমেইল এবং পাসওয়ার্ড প্রয়োজন",
+          variant: "destructive",
+        });
+        setIsSigningIn(false);
+        return;
+      }
 
-    const result = await signIn(signInData.email, signInData.password);
-    
-    if (result.success) {
+      console.log("📧 Attempting login with email:", signInData.email);
+      const result = await signIn(signInData.email, signInData.password);
+      console.log("🔐 Login result:", result.success ? "SUCCESS" : "FAILED", result.error || "");
+      
+      if (result.success) {
+        toast({
+          title: "সফল!",
+          description: "আপনি সফলভাবে লগইন করেছেন",
+        });
+        console.log("🎯 Redirecting to dashboard...");
+        // Use navigate instead of window.location.href for better UX
+        setTimeout(() => navigate("/dashboard"), 500);
+      } else {
+        const errorMsg = result.error || "অজানা ত্রুটি হয়েছে";
+        console.error("❌ Login failed:", errorMsg);
+        toast({
+          title: "লগইন ব্যর্থ",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("💥 Login exception:", error);
       toast({
-        title: "সফল!",
-        description: "আপনি সফলভাবে লগইন করেছেন",
-      });
-      // Redirect to dashboard immediately after successful login
-      window.location.href = "/dashboard";
-    } else {
-      toast({
-        title: "লগইন ব্যর্থ",
-        description: result.error || "অজানা ত্রুটি হয়েছে",
+        title: "লগইন ত্রুটি",
+        description: "সংযোগের সমস্যা। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSigningUp(true);
     
-    if (!signUpData.email || !signUpData.password || !signUpData.firstName) {
-      toast({
-        title: "ত্রুটি",
-        description: "সব ক্ষেত্র পূরণ করুন",
-        variant: "destructive",
-      });
-      return;
-    }
+    try {
+      console.log("📝 Starting signup process...");
+      
+      if (!signUpData.email || !signUpData.password || !signUpData.firstName) {
+        toast({
+          title: "ত্রুটি",
+          description: "সব ক্ষেত্র পূরণ করুন",
+          variant: "destructive",
+        });
+        setIsSigningUp(false);
+        return;
+      }
 
-    if (signUpData.password !== signUpData.confirmPassword) {
-      toast({
-        title: "ত্রুটি",
-        description: "পাসওয়ার্ড মিলছে না",
-        variant: "destructive",
-      });
-      return;
-    }
+      if (signUpData.password !== signUpData.confirmPassword) {
+        toast({
+          title: "ত্রুটি",
+          description: "পাসওয়ার্ড মিলছে না",
+          variant: "destructive",
+        });
+        setIsSigningUp(false);
+        return;
+      }
 
-    if (signUpData.password.length < 6) {
-      toast({
-        title: "ত্রুটি",
-        description: "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে",
-        variant: "destructive",
-      });
-      return;
-    }
+      if (signUpData.password.length < 6) {
+        toast({
+          title: "ত্রুটি",
+          description: "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে",
+          variant: "destructive",
+        });
+        setIsSigningUp(false);
+        return;
+      }
 
-    const result = await signUp(signUpData.email, signUpData.password, {
-      first_name: signUpData.firstName,
-      last_name: signUpData.lastName
-    });
-    
-    if (result.success) {
-      toast({
-        title: "সফল!",
-        description: "আপনার ইমেইল চেক করুন এবং একাউন্ট যাচাই করুন",
+      console.log("📧 Attempting signup with email:", signUpData.email);
+      const result = await signUp(signUpData.email, signUpData.password, {
+        first_name: signUpData.firstName,
+        last_name: signUpData.lastName
       });
-    } else {
+      
+      console.log("📝 Signup result:", result.success ? "SUCCESS" : "FAILED", result.error || "");
+      
+      if (result.success) {
+        toast({
+          title: "সফল!",
+          description: "একাউন্ট তৈরি হয়েছে। এখন লগইন করুন।",
+        });
+        // Clear form and switch to login tab
+        setSignUpData({
+          email: "",
+          password: "",
+          confirmPassword: "",
+          firstName: "",
+          lastName: ""
+        });
+      } else {
+        const errorMsg = result.error || "অজানা ত্রুটি হয়েছে";
+        console.error("❌ Signup failed:", errorMsg);
+        toast({
+          title: "রেজিস্ট্রেশন ব্যর্থ",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("💥 Signup exception:", error);
       toast({
-        title: "রেজিস্ট্রেশন ব্যর্থ",
-        description: result.error || "অজানা ত্রুটি হয়েছে",
+        title: "রেজিস্ট্রেশন ত্রুটি",
+        description: "সংযোগের সমস্যা। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
+    } finally {
+      setIsSigningUp(false);
     }
   };
 
@@ -166,8 +220,16 @@ export default function SupabaseLogin() {
                     type="submit"
                     className="w-full bg-islamic-green hover:bg-islamic-green/90"
                     data-testid="button-signin"
+                    disabled={isSigningIn}
                   >
-                    লগইন
+                    {isSigningIn ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        লগইন করা হচ্ছে...
+                      </>
+                    ) : (
+                      "লগইন"
+                    )}
                   </Button>
                 </form>
               </TabsContent>
@@ -233,8 +295,16 @@ export default function SupabaseLogin() {
                     type="submit"
                     className="w-full bg-islamic-green hover:bg-islamic-green/90"
                     data-testid="button-signup"
+                    disabled={isSigningUp}
                   >
-                    নিবন্ধন করুন
+                    {isSigningUp ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        নিবন্ধন করা হচ্ছে...
+                      </>
+                    ) : (
+                      "নিবন্ধন করুন"
+                    )}
                   </Button>
                 </form>
               </TabsContent>
