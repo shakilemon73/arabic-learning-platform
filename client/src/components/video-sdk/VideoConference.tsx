@@ -19,7 +19,7 @@ import {
   MessageSquare,
   Users,
   Settings,
-  Record,
+  Circle,
   MoreVertical
 } from 'lucide-react';
 
@@ -188,7 +188,7 @@ export function VideoConference({
         {isRecording && (
           <div className="absolute top-4 right-4">
             <Badge variant="destructive" className="animate-pulse">
-              <Record size={16} className="mr-2" />
+              <Circle size={16} className="mr-2 fill-current" />
               Recording
             </Badge>
           </div>
@@ -247,7 +247,7 @@ export function VideoConference({
             onClick={handleStartRecording}
             className="rounded-full w-12 h-12 p-0"
           >
-            <Record size={20} />
+            <Circle size={20} className={isRecording ? "fill-current" : ""} />
           </Button>
 
           {/* Settings */}
