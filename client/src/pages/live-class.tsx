@@ -208,7 +208,7 @@ function LiveClassContent() {
       console.log('Joining real video room with WebRTC...');
       await joinRoom({
         roomId: generatedRoomId,
-        userId: user.id,
+        userId: user.id ?? 'anonymous',
         userRole: isInstructor ? 'host' : 'participant',
         displayName: profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email?.split('@')[0] || 'User',
         avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.first_name || 'User')}&background=0D8ABC&color=fff`
