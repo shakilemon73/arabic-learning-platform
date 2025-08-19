@@ -140,26 +140,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Update auth state
   const updateAuthState = async (user: User | null, session: Session | null) => {
-    if (user) {
-      console.log('🔄 Auth state changed:', 'SIGNED_IN', 'User present');
-      const profile = await fetchUserProfile(user.id);
+    try {
+      if (user) {
+        console.log('🔄 Auth state changed:', 'SIGNED_IN', 'User present');
+        const profile = await fetchUserProfile(user.id);
+        setState(prev => ({
+          ...prev,
+          user,
+          profile,
+          session,
+          loading: false,
+          error: null,
+        }));
+      } else {
+        console.log('🔄 Auth state changed:', 'SIGNED_OUT', 'No user');
+        // Ensure complete cleanup on sign out
+        setState(prev => ({
+          ...prev,
+          user: null,
+          profile: null,
+          session: null,
+          loading: false,
+          error: null,
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating auth state:', error);
       setState(prev => ({
         ...prev,
-        user,
-        profile,
-        session,
         loading: false,
-        error: null,
-      }));
-    } else {
-      console.log('🔄 Auth state changed:', 'SIGNED_OUT', 'No user');
-      setState(prev => ({
-        ...prev,
-        user: null,
-        profile: null,
-        session: null,
-        loading: false,
-        error: null,
+        error: error as AuthError,
       }));
     }
   };
@@ -168,30 +178,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signIn = async (email: string, password: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-
-    if (error) {
-      setState(prev => ({ ...prev, loading: false, error }));
-      toast({
-        title: "সাইন ইন ত্রুটি",
-        description: error.message === 'Invalid login credentials' 
-          ? "ভুল ইমেইল বা পাসওয়ার্ড" 
-          : error.message,
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
-      return { error };
+
+      if (error) {
+        setState(prev => ({ ...prev, loading: false, error }));
+        toast({
+          title: "সাইন ইন ত্রুটি",
+          description: error.message === 'Invalid login credentials' 
+            ? "ভুল ইমেইল বা পাসওয়ার্ড" 
+            : error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // Auth state will be updated by the listener
+      toast({
+        title: "সফলভাবে লগইন হয়েছে",
+        description: "আপনার ড্যাশবোর্ডে স্বাগতম",
+      });
+
+      return { error: null };
+    } catch (err) {
+      const authError = err as AuthError;
+      setState(prev => ({ ...prev, loading: false, error: authError }));
+      return { error: authError };
     }
-
-    // Auth state will be updated by the listener
-    toast({
-      title: "সফলভাবে লগইন হয়েছে",
-      description: "আপনার ড্যাশবোর্ডে স্বাগতম",
-    });
-
-    return { error: null };
   };
 
   // Sign up function
@@ -239,25 +255,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     setState(prev => ({ ...prev, loading: true }));
     
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      setState(prev => ({ ...prev, loading: false, error }));
+    try {
+      // Clear state immediately to prevent cache issues
+      setState(prev => ({
+        ...prev,
+        user: null,
+        profile: null,
+        session: null,
+        loading: true,
+        error: null
+      }));
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        setState(prev => ({ ...prev, loading: false, error }));
+        toast({
+          title: "লগআউট ত্রুটি",
+          description: error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // Ensure complete cleanup
+      setState(prev => ({
+        ...prev,
+        user: null,
+        profile: null,
+        session: null,
+        loading: false,
+        error: null
+      }));
+      
       toast({
-        title: "লগআউট ত্রুটি",
-        description: error.message,
-        variant: "destructive",
+        title: "সফলভাবে লগআউট হয়েছে",
+        description: "আবার দেখা হবে!",
       });
-      return { error };
+
+      return { error: null };
+    } catch (err) {
+      const authError = err as AuthError;
+      setState(prev => ({ ...prev, loading: false, error: authError }));
+      return { error: authError };
     }
-
-    // Auth state will be updated by the listener
-    toast({
-      title: "সফলভাবে লগআউট হয়েছে",
-      description: "আবার দেখা হবে!",
-    });
-
-    return { error: null };
   };
 
   // Reset password function
@@ -370,7 +411,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth hook received user change:', session?.user ? 'User present' : 'No user');
-        await updateAuthState(session?.user || null, session);
+        console.log('🔄 Auth event:', event);
+        
+        // Prevent duplicate state updates for the same session
+        if (event === 'SIGNED_OUT') {
+          setState(prev => ({
+            ...prev,
+            user: null,
+            profile: null,
+            session: null,
+            loading: false,
+            error: null,
+          }));
+        } else {
+          await updateAuthState(session?.user || null, session);
+        }
       }
     );
 

@@ -62,6 +62,9 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Prevent double submission
+    if (isSubmitting || loading) return;
+    
     if (!validateForm()) return;
     
     setIsSubmitting(true);
@@ -70,6 +73,9 @@ export default function LoginPage() {
       const { error } = await signIn(formData.email, formData.password);
       
       if (!error) {
+        // Clear form data and reset state
+        setFormData({ email: '', password: '' });
+        setErrors({});
         // Successful login - redirect to dashboard
         setLocation('/dashboard');
       }
