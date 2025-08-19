@@ -58,7 +58,7 @@ function LiveClassContent() {
   } = useVideoSDK();
 
   // Get class ID from URL params
-  const classId = new URLSearchParams(window.location.search).get('id') || 'demo-class';
+  const classId = new URLSearchParams(window.location.search).get('id') || '33333333-3333-3333-3333-333333333333';
   
   // Fetch specific class data
   const { data: classData, isLoading: classLoading } = useQuery({
@@ -77,7 +77,7 @@ function LiveClassContent() {
 
   // Use specific class data - NO FALLBACK TO DEMO DATA
   const selectedClass = classData || (allClasses && allClasses[0]) || {
-    id: 'demo-class-1',
+    id: '33333333-3333-3333-3333-333333333333',
     title_bn: 'আরবি হরফ পরিচয়',
     title: 'Arabic Letter Introduction',
     description_bn: 'আরবি ভাষার মূল হরফগুলির সাথে পরিচয় এবং সঠিক উচ্চারণ শিখুন',
