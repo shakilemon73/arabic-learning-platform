@@ -69,256 +69,223 @@ export function VideoConference({
   // Handle participant video streams - REAL IMPLEMENTATION
   useEffect(() => {
     // Listen for remote stream events from the SDK
-    if (!isConnected) return;
+    if (!isConnected || !sdk) return;
 
-    const handleRemoteStream = (data: { participantId: string; stream: MediaStream }) => {
+    const handleRemoteStream = (event: any) => {
+      const { participantId, stream } = event.detail || event;
       setParticipantStreams(prev => {
-        const updated = new Map(prev);
-        updated.set(data.participantId, data.stream);
-        return updated;
+        const newStreams = new Map(prev);
+        newStreams.set(participantId, stream);
+        return newStreams;
       });
     };
 
-    const handleParticipantLeft = (data: { participantId: string }) => {
+    const handleParticipantLeft = (event: any) => {
+      const { participantId } = event.detail || event;
       setParticipantStreams(prev => {
-        const updated = new Map(prev);
-        updated.delete(data.participantId);
-        return updated;
+        const newStreams = new Map(prev);
+        newStreams.delete(participantId);
+        return newStreams;
       });
     };
 
-    // These events would be emitted by the VideoSDK when remote streams are received
-    window.addEventListener('remote-stream-added', handleRemoteStream as EventListener);
-    window.addEventListener('participant-left', handleParticipantLeft as EventListener);
+    // Add event listeners - REAL SDK EVENTS
+    if (sdk.on) {
+      sdk.on('remote-stream', handleRemoteStream);
+      sdk.on('participant-left', handleParticipantLeft);
 
-    return () => {
-      window.removeEventListener('remote-stream-added', handleRemoteStream as EventListener);
-      window.removeEventListener('participant-left', handleParticipantLeft as EventListener);
-    };
-  }, [participants, isConnected]);
-
-  const handleVideoToggle = async () => {
-    await toggleVideo();
-  };
-
-  const handleAudioToggle = async () => {
-    await toggleAudio();
-  };
-
-  const handleScreenShare = async () => {
-    if (isScreenSharing) {
-      await stopScreenShare();
-    } else {
-      await startScreenShare();
+      return () => {
+        sdk.off('remote-stream', handleRemoteStream);
+        sdk.off('participant-left', handleParticipantLeft);
+      };
     }
-  };
-
-  const handleLeaveRoom = async () => {
-    await leaveRoom();
-  };
-
-  const handleStartRecording = async () => {
-    try {
-      if (!isRecording) {
-        // Start real recording via SDK
-        await sdk?.startRecording?.();
-        setIsRecording(true);
-        console.log('Started recording');
-      } else {
-        // Stop real recording via SDK
-        await sdk?.stopRecording?.();
-        setIsRecording(false);
-        console.log('Stopped recording');
-      }
-    } catch (error) {
-      console.error('Recording error:', error);
-    }
-  };
+  }, [isConnected, sdk]);
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="p-8">
-          <CardContent className="text-center">
-            <h2 className="text-2xl font-semibold mb-4">Not Connected</h2>
-            <p className="text-muted-foreground">Please join a room to start the video conference.</p>
-          </CardContent>
-        </Card>
+      <div className="h-full flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-islamic-green border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-white font-bengali">ভিডিও কনফারেন্সে সংযোগ করা হচ্ছে...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-900">
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-500 text-white px-4 py-2 text-sm">
-          Error: {error}
-        </div>
-      )}
-
+    <div className="h-full flex flex-col bg-gray-900">
       {/* Main Video Area */}
       <div className="flex-1 relative">
         {/* Participants Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 h-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full p-4">
           {/* Local Video */}
-          <div className="relative">
-            <Card className="h-full bg-black">
-              <CardContent className="p-0 h-full relative">
+          <Card className="relative overflow-hidden bg-gray-800 border-gray-700">
+            <CardContent className="p-0 h-full">
+              <div className="relative h-full">
                 <video
                   ref={localVideoRef}
                   autoPlay
-                  playsInline
                   muted
-                  className="w-full h-full object-cover rounded-lg"
+                  playsInline
+                  className="w-full h-full object-cover"
                 />
-                <div className="absolute bottom-2 left-2">
-                  <Badge variant="secondary" className="bg-blue-600 text-white">
-                    You
+                <div className="absolute bottom-2 left-2 bg-islamic-green text-white px-2 py-1 rounded text-sm font-bengali">
+                  আপনি (You)
+                </div>
+                <div className="absolute top-2 right-2">
+                  <Badge variant={isVideoEnabled ? "default" : "destructive"} className="text-xs">
+                    {isVideoEnabled ? <Video className="w-3 h-3" /> : <VideoOff className="w-3 h-3" />}
                   </Badge>
                 </div>
-                <div className="absolute bottom-2 right-2 flex space-x-1">
-                  {!isVideoEnabled && (
-                    <div className="bg-red-500 p-1 rounded">
-                      <VideoOff size={16} className="text-white" />
-                    </div>
-                  )}
-                  {!isAudioEnabled && (
-                    <div className="bg-red-500 p-1 rounded">
-                      <MicOff size={16} className="text-white" />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Remote Participants */}
-          {participants.map((participant) => (
-            <ParticipantVideo
-              key={participant.id}
-              participant={participant}
-              stream={participantStreams.get(participant.id)}
-            />
-          ))}
-
-          {/* Empty slots */}
-          {Array.from({ length: Math.max(0, 8 - participants.length - 1) }).map((_, index) => (
-            <Card key={index} className="h-full bg-gray-800 border-gray-700">
-              <CardContent className="flex items-center justify-center h-full">
-                <div className="text-center text-gray-500">
-                  <Users size={48} />
-                  <p className="mt-2 text-sm">Waiting for participant</p>
+          {participants.map(participant => (
+            <Card key={participant.id} className="relative overflow-hidden bg-gray-800 border-gray-700">
+              <CardContent className="p-0 h-full">
+                <div className="relative h-full">
+                  {participantStreams.has(participant.id) ? (
+                    <ParticipantVideo 
+                      stream={participantStreams.get(participant.id)!} 
+                      participant={participant}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-16 h-16 bg-islamic-green rounded-full flex items-center justify-center mx-auto mb-2">
+                          <span className="text-white text-lg font-bold">
+                            {participant.name?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <p className="text-white text-sm font-bengali">{participant.name}</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white px-2 py-1 rounded text-sm font-bengali">
+                    {participant.name}
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <Badge variant={participant.videoEnabled ? "default" : "destructive"} className="text-xs">
+                      {participant.videoEnabled ? <Video className="w-3 h-3" /> : <VideoOff className="w-3 h-3" />}
+                    </Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Participant Count */}
-        <div className="absolute top-4 left-4">
-          <Badge variant="outline" className="bg-black/50 text-white border-gray-600">
-            <Users size={16} className="mr-2" />
-            {participants.length + 1} participants
-          </Badge>
-        </div>
+        {/* Error Display */}
+        {error && (
+          <div className="absolute top-4 left-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded font-bengali">
+            <strong>ত্রুটি:</strong> {error}
+          </div>
+        )}
 
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="absolute top-4 right-4">
-            <Badge variant="destructive" className="animate-pulse">
-              <Circle size={16} className="mr-2 fill-current" />
-              Recording
-            </Badge>
+          <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-2 rounded-lg flex items-center font-bengali">
+            <Circle className="w-3 h-3 mr-2 fill-current animate-pulse" />
+            রেকর্ডিং চলছে
           </div>
         )}
       </div>
 
       {/* Controls */}
       {showControls && (
-        <div className="bg-gray-800 p-4 flex items-center justify-center space-x-4">
-          {/* Video Control */}
+        <div className="bg-gray-800 px-4 py-3 flex items-center justify-center space-x-4">
           <Button
             variant={isVideoEnabled ? "default" : "destructive"}
-            size="lg"
-            onClick={handleVideoToggle}
-            className="rounded-full w-12 h-12 p-0"
+            size="sm"
+            onClick={() => toggleVideo()}
+            className="rounded-full w-12 h-12"
           >
-            {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+            {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
           </Button>
 
-          {/* Audio Control */}
           <Button
             variant={isAudioEnabled ? "default" : "destructive"}
-            size="lg"
-            onClick={handleAudioToggle}
-            className="rounded-full w-12 h-12 p-0"
+            size="sm"
+            onClick={() => toggleAudio()}
+            className="rounded-full w-12 h-12"
           >
-            {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+            {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
           </Button>
 
-          {/* Screen Share */}
           <Button
-            variant={isScreenSharing ? "secondary" : "outline"}
-            size="lg"
-            onClick={handleScreenShare}
-            className="rounded-full w-12 h-12 p-0"
+            variant={isScreenSharing ? "default" : "outline"}
+            size="sm"
+            onClick={() => isScreenSharing ? stopScreenShare() : startScreenShare()}
+            className="rounded-full w-12 h-12"
           >
-            {isScreenSharing ? <MonitorOff size={20} /> : <Monitor size={20} />}
+            {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
           </Button>
 
-          {/* Chat Toggle */}
-          {showChat && onChatToggle && (
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={onChatToggle}
-              className="rounded-full w-12 h-12 p-0"
-            >
-              <MessageSquare size={20} />
-            </Button>
-          )}
-
-          {/* Recording */}
-          <Button
-            variant={isRecording ? "destructive" : "outline"}
-            size="lg"
-            onClick={handleStartRecording}
-            className="rounded-full w-12 h-12 p-0"
-          >
-            <Circle size={20} className={isRecording ? "fill-current" : ""} />
-          </Button>
-
-          {/* Settings */}
-          {onSettingsOpen && (
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={onSettingsOpen}
-              className="rounded-full w-12 h-12 p-0"
-            >
-              <Settings size={20} />
-            </Button>
-          )}
-
-          {/* More Options */}
           <Button
             variant="outline"
-            size="lg"
-            className="rounded-full w-12 h-12 p-0"
+            size="sm"
+            onClick={onChatToggle}
+            className="rounded-full w-12 h-12"
           >
-            <MoreVertical size={20} />
+            <MessageSquare className="w-5 h-5" />
           </Button>
 
-          {/* Leave Room */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowParticipantList(!showParticipantList)}
+            className="rounded-full w-12 h-12"
+          >
+            <Users className="w-5 h-5" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSettingsOpen}
+            className="rounded-full w-12 h-12"
+          >
+            <Settings className="w-5 h-5" />
+          </Button>
+
           <Button
             variant="destructive"
-            size="lg"
-            onClick={handleLeaveRoom}
-            className="rounded-full w-12 h-12 p-0"
+            size="sm"
+            onClick={leaveRoom}
+            className="rounded-full w-12 h-12 ml-8"
           >
-            <Phone size={20} className="transform rotate-135" />
+            <Phone className="w-5 h-5" />
           </Button>
+        </div>
+      )}
+
+      {/* Participants List Sidebar */}
+      {showParticipantList && (
+        <div className="absolute right-0 top-0 bottom-0 w-80 bg-gray-800 border-l border-gray-700 p-4">
+          <h3 className="font-bengali text-white text-lg mb-4">অংশগ্রহণকারী ({participants.length + 1})</h3>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-3 p-2 bg-islamic-green/20 rounded">
+              <div className="w-8 h-8 bg-islamic-green rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">আপনি</span>
+              </div>
+              <span className="text-white font-bengali">আপনি (হোস্ট)</span>
+            </div>
+            {participants.map(participant => (
+              <div key={participant.id} className="flex items-center space-x-3 p-2 bg-gray-700 rounded">
+                <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">
+                    {participant.name?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <span className="text-white font-bengali">{participant.name}</span>
+                {participant.role === 'host' && (
+                  <Badge variant="secondary" className="text-xs">হোস্ট</Badge>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -326,72 +293,21 @@ export function VideoConference({
 }
 
 // Participant Video Component
-interface ParticipantVideoProps {
-  participant: any;
-  stream?: MediaStream;
-}
-
-function ParticipantVideo({ participant, stream }: ParticipantVideoProps) {
+function ParticipantVideo({ stream, participant }: { stream: MediaStream; participant: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (stream && videoRef.current) {
+    if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
 
   return (
-    <div className="relative">
-      <Card className="h-full bg-black">
-        <CardContent className="p-0 h-full relative">
-          {stream ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover rounded-lg"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full bg-gray-700">
-              <div className="text-center text-white">
-                <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-2 text-2xl font-semibold">
-                  {participant.displayName.charAt(0).toUpperCase()}
-                </div>
-                <p className="text-sm">{participant.displayName}</p>
-              </div>
-            </div>
-          )}
-          
-          <div className="absolute bottom-2 left-2">
-            <Badge variant="secondary" className="bg-black/70 text-white">
-              {participant.displayName}
-            </Badge>
-          </div>
-
-          <div className="absolute bottom-2 right-2 flex space-x-1">
-            {!participant.isVideoEnabled && (
-              <div className="bg-red-500 p-1 rounded">
-                <VideoOff size={16} className="text-white" />
-              </div>
-            )}
-            {!participant.isAudioEnabled && (
-              <div className="bg-red-500 p-1 rounded">
-                <MicOff size={16} className="text-white" />
-              </div>
-            )}
-          </div>
-
-          {/* Connection Quality Indicator */}
-          <div className="absolute top-2 right-2">
-            <div className={`w-2 h-2 rounded-full ${
-              participant.connectionQuality === 'excellent' ? 'bg-green-500' :
-              participant.connectionQuality === 'good' ? 'bg-yellow-500' :
-              participant.connectionQuality === 'poor' ? 'bg-red-500' :
-              'bg-gray-500'
-            }`} />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="w-full h-full object-cover"
+    />
   );
 }

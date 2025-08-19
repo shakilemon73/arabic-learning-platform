@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, Clock, Users, Play, Pause, MessageSquare, Video } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
 import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
@@ -190,7 +191,7 @@ function LiveClassContent() {
         await createVideoRoom({
           name: selectedClass.title_bn || selectedClass.title,
           description: selectedClass.description_bn || selectedClass.description,
-          host_user_id: user.id || 'default-user',
+          host_user_id: user.id || '',
           max_participants: selectedClass.max_participants || 100,
           is_public: true,
           scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
@@ -239,54 +240,16 @@ function LiveClassContent() {
     }
   };
 
-  // Show real VideoSDK conference if connected
+  // Show real VideoSDK conference with tabs if connected
   if (isClassActive && isConnected) {
-    return (
-      <div className="h-screen flex flex-col bg-gray-900">
-        {/* Arabic Learning Class Header */}
-        <div className="bg-islamic-green text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="p-2 bg-white/20 rounded-lg mr-4">
-              <Video className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold font-bengali">{selectedClass?.title_bn || selectedClass?.title || 'লাইভ ক্লাস'}</h1>
-              <p className="text-sm opacity-75 font-bengali">
-                {isInstructor ? 'শিক্ষক' : 'শিক্ষার্থী'} • {participants.length + 1} জন অংশগ্রহণকারী
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              <Clock className="w-4 h-4 mr-1" />
-              লাইভ ক্লাস
-            </Badge>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLeaveClass}
-              className="bg-white/10 text-white border-white/30 hover:bg-white/20 font-bengali"
-            >
-              ক্লাস ছেড়ে দিন
-            </Button>
-          </div>
-        </div>
-
-        {/* Real VideoSDK Conference */}
-        <div className="flex-1">
-          <VideoConference
-            showChat={showChat}
-            onChatToggle={() => setShowChat(!showChat)}
-          />
-        </div>
-
-        {/* Class-specific bottom bar */}
-        <div className="bg-islamic-green/90 text-white px-4 py-2 text-sm text-center font-bengali">
-          আজকের বিষয়: আরবি হরফের পরিচয় ও উচ্চারণ • সময়কাল: {selectedClass?.duration || 90} মিনিট
-        </div>
-      </div>
-    );
+    return <LiveClassWithTabs 
+      selectedClass={selectedClass}
+      isInstructor={isInstructor}
+      participants={participants}
+      showChat={showChat}
+      setShowChat={setShowChat}
+      onLeaveClass={handleLeaveClass}
+    />;
   }
 
   return (
@@ -528,6 +491,145 @@ function LiveClassContent() {
             </Card>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Live Class with Tabs Component
+function LiveClassWithTabs({ 
+  selectedClass, 
+  isInstructor, 
+  participants, 
+  showChat, 
+  setShowChat, 
+  onLeaveClass 
+}: {
+  selectedClass: any;
+  isInstructor: boolean;
+  participants: any[];
+  showChat: boolean;
+  setShowChat: (show: boolean) => void;
+  onLeaveClass: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState('video');
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-900">
+      {/* Arabic Learning Class Header */}
+      <div className="bg-islamic-green text-white px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="p-2 bg-white/20 rounded-lg mr-4">
+            <Video className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold font-bengali">{selectedClass?.title_bn || selectedClass?.title || 'লাইভ ক্লাস'}</h1>
+            <p className="text-sm opacity-75 font-bengali">
+              {isInstructor ? 'শিক্ষক' : 'শিক্ষার্থী'} • {participants.length + 1} জন অংশগ্রহণকারী
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+            <Clock className="w-4 h-4 mr-1" />
+            লাইভ ক্লাস
+          </Badge>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onLeaveClass}
+            className="bg-white/10 text-white border-white/30 hover:bg-white/20 font-bengali"
+          >
+            ক্লাস ছেড়ে দিন
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabbed Interface */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-b border-gray-700">
+          <TabsTrigger value="video" className="font-bengali text-white data-[state=active]:bg-islamic-green data-[state=active]:text-white">
+            📹 ভিডিও কনফারেন্স
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="font-bengali text-white data-[state=active]:bg-islamic-green data-[state=active]:text-white">
+            💬 চ্যাট
+          </TabsTrigger>
+          <TabsTrigger value="whiteboard" className="font-bengali text-white data-[state=active]:bg-islamic-green data-[state=active]:text-white">
+            🖊️ হোয়াইটবোর্ড
+          </TabsTrigger>
+          <TabsTrigger value="resources" className="font-bengali text-white data-[state=active]:bg-islamic-green data-[state=active]:text-white">
+            📚 রিসোর্স
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="video" className="flex-1 m-0">
+          <VideoConference showChat={false} onChatToggle={() => setActiveTab('chat')} />
+        </TabsContent>
+
+        <TabsContent value="chat" className="flex-1 m-0 p-4 bg-gray-800">
+          <div className="h-full bg-gray-900 rounded-lg p-4">
+            <h3 className="font-bengali text-white text-lg mb-4">লাইভ চ্যাট</h3>
+            <div className="flex-1 bg-gray-800 rounded-lg p-4 mb-4 min-h-96 overflow-y-auto">
+              <p className="text-gray-400 font-bengali text-center">চ্যাট বার্তা এখানে দেখা যাবে...</p>
+            </div>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="আপনার বার্তা লিখুন..."
+                className="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 font-bengali"
+              />
+              <Button className="bg-islamic-green hover:bg-islamic-green/80 text-white px-6">
+                পাঠান
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="whiteboard" className="flex-1 m-0 p-4 bg-gray-800">
+          <div className="h-full bg-gray-900 rounded-lg p-4">
+            <h3 className="font-bengali text-white text-lg mb-4">ইন্টারেক্টিভ হোয়াইটবোর্ড</h3>
+            <div className="flex-1 bg-white rounded-lg min-h-96 border-2 border-gray-600">
+              <p className="text-gray-600 font-bengali text-center p-8">হোয়াইটবোর্ড এখানে লোড হবে...</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="resources" className="flex-1 m-0 p-4 bg-gray-800">
+          <div className="h-full bg-gray-900 rounded-lg p-4">
+            <h3 className="font-bengali text-white text-lg mb-4">ক্লাসের রিসোর্স</h3>
+            <div className="space-y-4">
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="font-bengali text-white font-medium mb-2">আজকের পাঠ্য</h4>
+                <ul className="space-y-2 font-bengali text-gray-300">
+                  <li>• আরবি হরফের পরিচয়</li>
+                  <li>• হরফের উচ্চারণ অনুশীলন</li>
+                  <li>• সাধারণ শব্দগঠন</li>
+                </ul>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="font-bengali text-white font-medium mb-2">ডাউনলোড</h4>
+                <ul className="space-y-2">
+                  <li>
+                    <Button variant="outline" size="sm" className="text-white border-gray-600 hover:bg-gray-700 font-bengali">
+                      📄 আরবি হরফের চার্ট
+                    </Button>
+                  </li>
+                  <li>
+                    <Button variant="outline" size="sm" className="text-white border-gray-600 hover:bg-gray-700 font-bengali">
+                      🎵 উচ্চারণ গাইড অডিও
+                    </Button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Class-specific bottom bar */}
+      <div className="bg-islamic-green/90 text-white px-4 py-2 text-sm text-center font-bengali">
+        আজকের বিষয়: আরবি হরফের পরিচয় ও উচ্চারণ • সময়কাল: {selectedClass?.duration || 90} মিনিট
       </div>
     </div>
   );
