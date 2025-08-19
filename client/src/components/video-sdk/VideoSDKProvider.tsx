@@ -50,11 +50,17 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
   // Initialize SDK
   const initializeSDK = async (config: VideoSDKConfig): Promise<void> => {
     try {
+      console.log('🚀 Initializing VideoSDK with config:', {
+        supabaseUrl: config.supabaseUrl ? 'configured' : 'missing',
+        supabaseKey: config.supabaseKey ? 'configured' : 'missing',
+        maxParticipants: config.maxParticipants
+      });
+      
       if (sdk) {
+        console.log('🧹 Destroying existing SDK instance...');
         await sdk.destroy();
       }
 
-      console.log('🚀 Initializing VideoSDK with config:', config);
       const newSDK = new VideoSDK(config);
       setSdk(newSDK);
       
@@ -68,6 +74,7 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize SDK';
       console.error('❌ SDK initialization failed:', errorMessage);
+      console.error('📋 Full error:', err);
       setError(errorMessage);
       setIsInitialized(false);
       throw err;
@@ -77,12 +84,21 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
   // Join room for real-time video conversation
   const joinRoom = async (sessionConfig: SessionConfig): Promise<void> => {
     if (!sdk) {
-      throw new Error('SDK not initialized');
+      throw new Error('SDK not initialized - please wait for initialization to complete');
+    }
+
+    if (!isInitialized) {
+      throw new Error('SDK not properly initialized - initialization state is false');
     }
 
     try {
       setError(null);
-      console.log('🔄 Joining video room:', sessionConfig);
+      console.log('🔄 Joining video room with session config:', sessionConfig);
+      console.log('📊 Current SDK state:', {
+        sdkExists: !!sdk,
+        isInitialized,
+        isConnected
+      });
       
       // Join room and establish WebRTC connections
       await sdk.joinRoom(sessionConfig);
@@ -95,7 +111,12 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
         setLocalStream(stream);
         setIsVideoEnabled(sdk.isVideoEnabledState());
         setIsAudioEnabled(sdk.isAudioEnabledState());
-        console.log('🎥 Local video stream ready');
+        console.log('🎥 Local video stream ready with tracks:', {
+          video: stream.getVideoTracks().length,
+          audio: stream.getAudioTracks().length
+        });
+      } else {
+        console.log('⚠️ No local stream available yet');
       }
 
       console.log('✅ Successfully joined video room');
@@ -103,6 +124,7 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
       console.error('❌ Failed to join video room:', errorMessage);
+      console.error('📋 Join room error details:', err);
       setError(errorMessage);
       setIsConnected(false);
       throw err;

@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
 import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
 import { VideoConference } from '@/components/video-sdk/VideoConference';
-import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
+// import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
 
 
 // Video SDK Configuration
@@ -154,9 +154,14 @@ function LiveClassContent() {
 
   const initializeVideoSDK = async () => {
     try {
+      console.log('🚀 Starting VideoSDK initialization...');
+      console.log('📊 SDK Status - isInitialized:', isInitialized);
+      
       await initializeSDK(VIDEO_SDK_CONFIG);
+      console.log('✅ VideoSDK initialization completed successfully');
     } catch (err) {
-      console.error('Failed to initialize VideoSDK:', err);
+      console.error('❌ Failed to initialize VideoSDK:', err);
+      console.error('🔍 Error details:', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
@@ -178,26 +183,27 @@ function LiveClassContent() {
       
       console.log('Creating real video room with ID:', generatedRoomId);
       
-      // Create room in database - REAL DATABASE OPERATIONS
-      try {
-        await createVideoRoom({
-          name: selectedClass.title_bn || selectedClass.title || 'Live Class',
-          description: selectedClass.description_bn || selectedClass.description || 'Arabic Learning Session',
-          host_user_id: user.id!,
-          max_participants: selectedClass.max_participants || 100,
-          is_public: true,
-          scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
-          scheduled_end_time: selectedClass.scheduled_at && selectedClass.duration ? 
-            new Date(new Date(selectedClass.scheduled_at).getTime() + (selectedClass.duration * 60 * 1000)) :
-            new Date(Date.now() + 90 * 60 * 1000)
-        });
-        console.log('Successfully created room in database');
-      } catch (dbError) {
-        console.log('Room may already exist, proceeding to join:', dbError);
-      }
+      // Skip room creation for now - use existing live class structure
+      // We'll use the existing live class as the room reference
+      console.log('📍 Using existing class structure, skipping room creation');
 
+      // Ensure SDK is properly initialized before joining
+      if (!isInitialized) {
+        console.log('⚠️ SDK not initialized, attempting to initialize first...');
+        await initializeSDK(VIDEO_SDK_CONFIG);
+        // Wait a moment for initialization to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       // Join the room via VideoSDK - REAL VIDEO CONNECTION
-      console.log('Joining real video room with WebRTC...');
+      console.log('🔗 Joining real video room with WebRTC...');
+      console.log('🎯 Room details:', {
+        roomId: generatedRoomId,
+        userId: user.id,
+        userRole: isInstructor ? 'host' : 'participant',
+        displayName: profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email?.split('@')[0] || 'User'
+      });
+      
       await joinRoom({
         roomId: generatedRoomId,
         userId: user.id ?? 'anonymous',
@@ -370,7 +376,7 @@ function LiveClassContent() {
                   ) : (
                     <Button
                       onClick={handleJoinClass}
-                      disabled={isLoading || !isInitialized}
+                      disabled={isLoading}
                       className="flex-1 bg-white text-islamic-green hover:bg-gray-100 btn-kinetic"
                       size="lg"
                       data-testid="join-class"
@@ -384,6 +390,7 @@ function LiveClassContent() {
                         <>
                           <Users className="w-5 h-5 mr-2" />
                           ক্লাসে যোগ দিন
+                          {!isInitialized && <span className="ml-2 text-xs">(SDK Loading...)</span>}
                         </>
                       )}
                     </Button>
