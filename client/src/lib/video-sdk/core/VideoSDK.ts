@@ -1,29 +1,10 @@
 /**
- * WorldClass Video SDK - Core Engine
- * Enterprise-grade video streaming, audio, live chat, and collaboration SDK
- * Built for scalability with WebRTC SFU architecture and Supabase backend
+ * WorldClass Video SDK - Core Engine (Simplified for Real Functionality)
+ * Real WebRTC peer-to-peer video conferencing like Zoom
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { EventEmitter } from './EventEmitter';
-import { MediaManager } from './MediaManager';
-import { SignalingManager } from './SignalingManager';
-import { PeerConnectionManager } from './PeerConnectionManager';
-import { ChatManager } from './ChatManager';
-import { ScreenShareManager } from './ScreenShareManager';
-import { WhiteboardManager } from './WhiteboardManager';
-import { RecordingManager } from './RecordingManager';
-import { ModeratorManager } from './ModeratorManager';
-import { StreamQualityManager } from './StreamQualityManager';
-
-// ENGINEERING MIRACLES - World-class features that beat all competitors
-import { HyperScaleManager } from './HyperScaleManager';
-import { AITranslationManager } from './AITranslationManager';
-import { AIFeaturesManager } from './AIFeaturesManager';
-import { MetaverseManager } from './MetaverseManager';
-import { ConnectionOptimizer } from './ConnectionOptimizer';
-import { AdaptiveStreamingManager } from './AdaptiveStreamingManager';
-import { ArabicLearningManager } from './ArabicLearningManager';
 
 export interface VideoSDKConfig {
   supabaseUrl: string;
@@ -34,45 +15,7 @@ export interface VideoSDKConfig {
     username?: string;
     credential?: string;
   }>;
-  enableAI?: boolean;
-  enableRecording?: boolean;
-  enableWhiteboard?: boolean;
   maxParticipants?: number;
-  
-  // ENGINEERING MIRACLES CONFIG
-  enableHyperScale?: boolean;
-  enableAITranslation?: boolean;
-  enableMetaverse?: boolean;
-  enableConnectionOptimization?: boolean;
-  enableAdaptiveStreaming?: boolean;
-  enableArabicLearning?: boolean;
-  
-  // Advanced configurations
-  hyperScaleConfig?: {
-    maxParticipants: number;
-    workerShards: number;
-    autoScale: boolean;
-  };
-  translationConfig?: {
-    languages: string[];
-    provider: string;
-    voiceToVoice: boolean;
-  };
-  metaverseConfig?: {
-    arEnabled: boolean;
-    vrEnabled: boolean;
-    environments: string[];
-  };
-  arabicLearningConfig?: {
-    dialect: string;
-    focus: string;
-    pronunciationCoaching: boolean;
-    tajweedAnalysis: boolean;
-  };
-  bitrate?: {
-    video: number;
-    audio: number;
-  };
 }
 
 export interface SessionConfig {
@@ -81,6 +24,18 @@ export interface SessionConfig {
   userRole: 'host' | 'moderator' | 'participant' | 'viewer';
   displayName: string;
   avatar?: string;
+}
+
+export interface ParticipantInfo {
+  id: string;
+  name: string;
+  avatar?: string;
+  role: string;
+  videoEnabled: boolean;
+  audioEnabled: boolean;
+  screenSharing: boolean;
+  connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
+  joinedAt: Date;
 }
 
 export interface MediaConstraints {
@@ -97,18 +52,6 @@ export interface MediaConstraints {
   };
 }
 
-export interface ParticipantInfo {
-  id: string;
-  displayName: string;
-  avatar?: string;
-  role: string;
-  isVideoEnabled: boolean;
-  isAudioEnabled: boolean;
-  isScreenSharing: boolean;
-  connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
-  joinedAt: Date;
-}
-
 export interface StreamQuality {
   resolution: '4K' | '1080p' | '720p' | '480p' | '360p';
   frameRate: 60 | 30 | 15;
@@ -123,695 +66,467 @@ export class VideoSDK extends EventEmitter {
   private isInitialized = false;
   private isConnected = false;
 
-  // Core managers
-  private mediaManager!: MediaManager;
-  private signalingManager!: SignalingManager;
-  private peerConnectionManager!: PeerConnectionManager;
-  private chatManager!: ChatManager;
-  private screenShareManager!: ScreenShareManager;
-  private whiteboardManager!: WhiteboardManager;
-  private recordingManager!: RecordingManager;
-  private moderatorManager!: ModeratorManager;
-  private streamQualityManager!: StreamQualityManager;
-  
-  // ENGINEERING MIRACLES - World-class features
-  private hyperScaleManager!: HyperScaleManager;
-  private aiTranslationManager!: AITranslationManager;
-  private aiFeaturesManager!: AIFeaturesManager;
-  private metaverseManager!: MetaverseManager;
-  private connectionOptimizer!: ConnectionOptimizer;
-  private adaptiveStreamingManager!: AdaptiveStreamingManager;
-  private arabicLearningManager!: ArabicLearningManager;
-
-  // State management
+  // WebRTC Connection Management
   private localStream: MediaStream | null = null;
   private participants = new Map<string, ParticipantInfo>();
+  private peerConnections = new Map<string, RTCPeerConnection>();
   private remoteStreams = new Map<string, MediaStream>();
+  
+  // Media state
+  private isVideoEnabled = true;
+  private isAudioEnabled = true;
+  private isScreenSharing = false;
 
   constructor(config: VideoSDKConfig) {
     super();
     
     this.config = {
-      stunServers: ['stun:stun.l.google.com:19302'],
+      stunServers: [
+        'stun:stun.l.google.com:19302',
+        'stun:stun1.l.google.com:19302',
+        'stun:stun2.l.google.com:19302'
+      ],
       turnServers: [],
-      enableAI: true,
-      enableRecording: true,
-      enableWhiteboard: true,
-      maxParticipants: 10000, // Upgraded with HyperScale
-      
-      // ENGINEERING MIRACLES - ENABLED BY DEFAULT
-      enableHyperScale: true,
-      enableAITranslation: true,
-      enableMetaverse: true,
-      enableConnectionOptimization: true,
-      enableAdaptiveStreaming: true,
-      enableArabicLearning: true,
-      
-      // Default miracle configurations
-      hyperScaleConfig: {
-        maxParticipants: 10000,
-        workerShards: 8,
-        autoScale: true
-      },
-      translationConfig: {
-        languages: ['en', 'ar', 'es', 'fr', 'de', 'zh', 'ja', 'hi', 'bn'],
-        provider: 'kudo',
-        voiceToVoice: true
-      },
-      metaverseConfig: {
-        arEnabled: true,
-        vrEnabled: true,
-        environments: ['cairo-classroom', 'damascus-library', 'mecca-study-circle']
-      },
-      arabicLearningConfig: {
-        dialect: 'MSA',
-        focus: 'quranic',
-        pronunciationCoaching: true,
-        tajweedAnalysis: true
-      },
-      bitrate: {
-        video: 2500, // kbps
-        audio: 128   // kbps
-      },
+      maxParticipants: 100,
       ...config
     };
 
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
-    this.initializeManagers();
+    this.isInitialized = true;
   }
 
-  private initializeManagers(): void {
-    // Initialize core managers
-    this.mediaManager = new MediaManager(this.config);
-    this.signalingManager = new SignalingManager(this.supabase);
-    this.peerConnectionManager = new PeerConnectionManager(this.config);
-    this.chatManager = new ChatManager(this.supabase);
-    this.screenShareManager = new ScreenShareManager();
-    this.whiteboardManager = new WhiteboardManager(this.supabase);
-    this.recordingManager = new RecordingManager(this.supabase);
-    this.moderatorManager = new ModeratorManager(this.supabase);
-    this.streamQualityManager = new StreamQualityManager();
-    
-    // Initialize ENGINEERING MIRACLES
-    if (this.config.enableHyperScale) {
-      this.hyperScaleManager = new HyperScaleManager(this.config.hyperScaleConfig);
-    }
-    if (this.config.enableAITranslation) {
-      this.aiTranslationManager = new AITranslationManager(this.supabase, this.config.translationConfig);
-    }
-    if (this.config.enableAI) {
-      this.aiFeaturesManager = new AIFeaturesManager(this.supabase);
-    }
-    if (this.config.enableMetaverse) {
-      this.metaverseManager = new MetaverseManager(this.supabase, this.config.metaverseConfig);
-    }
-    if (this.config.enableConnectionOptimization) {
-      this.connectionOptimizer = new ConnectionOptimizer(this.supabase);
-    }
-    if (this.config.enableAdaptiveStreaming) {
-      this.adaptiveStreamingManager = new AdaptiveStreamingManager(this.supabase);
-    }
-    if (this.config.enableArabicLearning) {
-      this.arabicLearningManager = new ArabicLearningManager(this.supabase, this.config.arabicLearningConfig);
-    }
-
-    // Setup event listeners
-    this.setupEventListeners();
-  }
-
-  private setupEventListeners(): void {
-    // Signaling events - Real WebRTC implementation
-    this.signalingManager.on('offer-received', this.handleOffer.bind(this));
-    this.signalingManager.on('answer-received', this.handleAnswer.bind(this));
-    this.signalingManager.on('ice-candidate-received', this.handleIceCandidate.bind(this));
-    this.signalingManager.on('participant-joined', this.handleUserJoined.bind(this));
-    this.signalingManager.on('participant-left', this.handleUserLeft.bind(this));
-
-    // Peer connection events - Real WebRTC streams
-    this.peerConnectionManager.on('remote-stream', this.handleRemoteStream.bind(this));
-    this.peerConnectionManager.on('connection-state-change', this.handleConnectionStateChange.bind(this));
-    this.peerConnectionManager.on('ice-candidate', this.handlePeerIceCandidate.bind(this));
-    this.peerConnectionManager.on('answer-created', this.handleAnswerCreated.bind(this));
-
-    // Chat events
-    this.chatManager.on('message-received', this.handleChatMessage.bind(this));
-
-    // Screen share events
-    this.screenShareManager.on('screen-share-started', this.handleScreenShareStarted.bind(this));
-    this.screenShareManager.on('screen-share-stopped', this.handleScreenShareStopped.bind(this));
-
-    // Stream quality events
-    this.streamQualityManager.on('quality-changed', this.handleQualityChanged.bind(this));
-  }
-
-  /**
-   * Initialize the SDK with session configuration
-   */
-  async initialize(sessionConfig: SessionConfig): Promise<void> {
+  // Initialize media and join room
+  async joinRoom(sessionConfig: SessionConfig): Promise<void> {
     try {
-      if (this.isInitialized) {
-        throw new Error('SDK already initialized');
-      }
-
+      console.log('🔄 Joining room:', sessionConfig.roomId);
       this.session = sessionConfig;
-      
-      // Initialize signaling connection
-      await this.signalingManager.connect(sessionConfig.roomId, sessionConfig.userId);
-      
-      // Initialize media devices
-      await this.mediaManager.initialize();
-      
-      this.isInitialized = true;
-      this.emit('sdk-initialized', { sessionConfig });
-      
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-      throw error;
-    }
-  }
 
-  /**
-   * Join a room and start the session
-   */
-  async joinRoom(mediaConstraints?: MediaConstraints): Promise<void> {
-    try {
-      if (!this.isInitialized) {
-        throw new Error('SDK not initialized');
-      }
+      // Get user media first
+      await this.initializeMedia();
 
-      if (!this.session) {
-        throw new Error('Session configuration missing');
-      }
+      // Setup signaling
+      await this.setupSignaling();
 
-      // Get user media
-      this.localStream = await this.mediaManager.getUserMedia(mediaConstraints);
-      
       // Join room in database
-      await this.supabase
-        .from('participants')
-        .insert({
-          room_id: this.session.roomId,
-          user_id: this.session.userId,
-          display_name: this.session.displayName,
-          user_role: this.session.userRole,
-          avatar_url: this.session.avatar,
-          is_connected: true
-        });
-
-      // Announce joining to other participants
-      await this.signalingManager.broadcastUserJoined({
-        userId: this.session.userId,
-        displayName: this.session.displayName,
-        role: this.session.userRole,
-        avatar: this.session.avatar
-      });
+      await this.joinRoomInDatabase();
 
       this.isConnected = true;
-      this.emit('room-joined', { 
-        roomId: this.session.roomId, 
-        localStream: this.localStream 
-      });
-
+      this.emit('connected', { roomId: sessionConfig.roomId });
+      console.log('✅ Successfully joined room');
+      
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
+      console.error('❌ Failed to join room:', error);
+      this.emit('error', { message: 'Failed to join room: ' + (error as Error).message });
       throw error;
     }
   }
 
-  /**
-   * Leave the room and cleanup
-   */
-  async leaveRoom(): Promise<void> {
+  // Initialize camera and microphone
+  private async initializeMedia(): Promise<void> {
     try {
-      if (!this.session || !this.isConnected) {
-        return;
-      }
-
-      // Stop local stream
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(track => track.stop());
-        this.localStream = null;
-      }
-
-      // Stop screen sharing if active
-      await this.stopScreenShare();
-
-      // Update database
-      await this.supabase
-        .from('participants')
-        .update({ 
-          is_connected: false,
-          left_at: new Date().toISOString()
-        })
-        .eq('room_id', this.session.roomId)
-        .eq('user_id', this.session.userId);
-
-      // Announce leaving
-      await this.signalingManager.broadcastUserLeft({
-        userId: this.session.userId
-      });
-
-      // Cleanup connections
-      this.peerConnectionManager.cleanup();
-      this.participants.clear();
-      this.remoteStreams.clear();
-
-      this.isConnected = false;
-      this.emit('room-left', { roomId: this.session.roomId });
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Toggle local video on/off
-   */
-  async toggleVideo(enabled?: boolean): Promise<boolean> {
-    try {
-      const isEnabled = await this.mediaManager.toggleVideo(this.localStream, enabled);
+      console.log('🎥 Initializing camera and microphone...');
       
-      // Update participant state
-      await this.updateParticipantState({
-        is_video_enabled: isEnabled
-      });
-
-      this.emit('video-toggled', { enabled: isEnabled });
-      return isEnabled;
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-      return false;
-    }
-  }
-
-  /**
-   * Toggle local audio on/off
-   */
-  async toggleAudio(enabled?: boolean): Promise<boolean> {
-    try {
-      const isEnabled = await this.mediaManager.toggleAudio(this.localStream, enabled);
-      
-      // Update participant state
-      await this.updateParticipantState({
-        is_audio_enabled: isEnabled
-      });
-
-      this.emit('audio-toggled', { enabled: isEnabled });
-      return isEnabled;
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-      return false;
-    }
-  }
-
-  /**
-   * Start screen sharing
-   */
-  async startScreenShare(): Promise<MediaStream | null> {
-    try {
-      const screenStream = await this.screenShareManager.startScreenShare();
-      
-      if (screenStream) {
-        // Replace video track in peer connections
-        await this.peerConnectionManager.replaceVideoTrack(screenStream.getVideoTracks()[0]);
-        
-        // Update participant state
-        await this.updateParticipantState({
-          is_screen_sharing: true
-        });
-
-        this.emit('screen-share-started', { stream: screenStream });
-      }
-
-      return screenStream;
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-      return null;
-    }
-  }
-
-  /**
-   * Stop screen sharing
-   */
-  async stopScreenShare(): Promise<void> {
-    try {
-      await this.screenShareManager.stopScreenShare();
-      
-      // Restore camera video track
-      if (this.localStream) {
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (videoTrack) {
-          await this.peerConnectionManager.replaceVideoTrack(videoTrack);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
-      }
-
-      // Update participant state
-      await this.updateParticipantState({
-        is_screen_sharing: false
       });
 
-      this.emit('screen-share-stopped');
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Send chat message
-   */
-  async sendChatMessage(message: string, type: 'text' | 'emoji' | 'file' = 'text'): Promise<void> {
-    try {
-      if (!this.session) {
-        throw new Error('Session not initialized');
-      }
-
-      await this.chatManager.sendMessage({
-        roomId: this.session.roomId,
-        userId: this.session.userId,
-        displayName: this.session.displayName,
-        message,
-        type
-      });
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Start recording session
-   */
-  async startRecording(): Promise<void> {
-    try {
-      if (!this.session) {
-        throw new Error('Session not initialized');
-      }
-
-      // Check if user has permission
-      if (this.session.userRole !== 'host' && this.session.userRole !== 'moderator') {
-        throw new Error('Permission denied: Only hosts and moderators can start recording');
-      }
-
-      await this.recordingManager.startRecording({
-        roomId: this.session.roomId,
-        initiatedBy: this.session.userId,
-        recordVideo: true,
-        recordAudio: true,
-        recordScreen: false,
-        quality: 'medium' as const,
-        format: 'mp4'
-      });
-
-      this.emit('recording-started');
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Stop recording session
-   */
-  async stopRecording(): Promise<void> {
-    try {
-      if (!this.session) {
-        throw new Error('Session not initialized');
-      }
-
-      await this.recordingManager.stopRecording(this.session.roomId);
-      this.emit('recording-stopped');
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Change stream quality
-   */
-  async setStreamQuality(quality: StreamQuality): Promise<void> {
-    try {
-      await this.streamQualityManager.setQuality(quality);
+      this.localStream = stream;
+      this.emit('local-stream', { stream });
+      console.log('✅ Media initialized successfully');
       
-      // Update peer connections with new quality
-      await this.peerConnectionManager.updateStreamQuality(quality);
-
-      this.emit('stream-quality-changed', { quality });
-
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
+      console.error('❌ Failed to get user media:', error);
+      throw new Error('Camera/microphone access denied. Please allow permissions.');
     }
   }
 
-  /**
-   * Moderator: Mute participant
-   */
-  async muteParticipant(participantId: string, mediaType: 'audio' | 'video'): Promise<void> {
-    try {
-      if (!this.session) {
-        throw new Error('Session not initialized');
-      }
-
-      // Check moderator permissions
-      if (this.session.userRole !== 'host' && this.session.userRole !== 'moderator') {
-        throw new Error('Permission denied: Only hosts and moderators can mute participants');
-      }
-
-      await this.moderatorManager.muteParticipant({
-        roomId: this.session.roomId,
-        moderatorId: this.session.userId,
-        participantId,
-        mediaType,
-        action: 'mute'
-      });
-
-      this.emit('participant-muted', { participantId, mediaType });
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
-    }
-  }
-
-  /**
-   * Get all participants in the room
-   */
-  getParticipants(): ParticipantInfo[] {
-    return Array.from(this.participants.values());
-  }
-
-  /**
-   * Get local stream
-   */
-  getLocalStream(): MediaStream | null {
-    return this.localStream;
-  }
-
-  /**
-   * Get remote stream by participant ID
-   */
-  getRemoteStream(participantId: string): MediaStream | null {
-    return this.remoteStreams.get(participantId) || null;
-  }
-
-  /**
-   * Check if SDK is initialized
-   */
-  isSDKInitialized(): boolean {
-    return this.isInitialized;
-  }
-
-  /**
-   * Check if connected to room
-   */
-  isRoomConnected(): boolean {
-    return this.isConnected;
-  }
-
-  // Private helper methods
-  private async updateParticipantState(updates: any): Promise<void> {
+  // Setup real-time signaling with Supabase
+  private async setupSignaling(): Promise<void> {
     if (!this.session) return;
 
-    await this.supabase
-      .from('participants')
-      .update(updates)
-      .eq('room_id', this.session.roomId)
-      .eq('user_id', this.session.userId);
+    // Listen for new participants
+    const channel = this.supabase
+      .channel(`room:${this.session.roomId}`)
+      .on('presence', { event: 'join' }, (payload) => {
+        console.log('👤 New participant joined:', payload);
+        this.handleParticipantJoined(payload.data);
+      })
+      .on('presence', { event: 'leave' }, (payload) => {
+        console.log('👋 Participant left:', payload);
+        this.handleParticipantLeft(payload.data.userId);
+      })
+      .on('broadcast', { event: 'offer' }, (payload) => {
+        this.handleOffer(payload.payload);
+      })
+      .on('broadcast', { event: 'answer' }, (payload) => {
+        this.handleAnswer(payload.payload);
+      })
+      .on('broadcast', { event: 'ice-candidate' }, (payload) => {
+        this.handleIceCandidate(payload.payload);
+      })
+      .subscribe();
+
+    // Join presence
+    await channel.track({
+      userId: this.session.userId,
+      displayName: this.session.displayName,
+      role: this.session.userRole,
+      videoEnabled: this.isVideoEnabled,
+      audioEnabled: this.isAudioEnabled
+    });
   }
 
-  private handleUserJoined(data: any): void {
+  // Handle new participant joining
+  private async handleParticipantJoined(participantData: any): Promise<void> {
+    if (!this.session || participantData.userId === this.session.userId) return;
+
+    console.log('🔄 Setting up connection with participant:', participantData.userId);
+
     const participant: ParticipantInfo = {
-      id: data.userId,
-      displayName: data.displayName,
-      avatar: data.avatar,
-      role: data.role,
-      isVideoEnabled: true,
-      isAudioEnabled: true,
-      isScreenSharing: false,
+      id: participantData.userId,
+      name: participantData.displayName,
+      role: participantData.role,
+      videoEnabled: participantData.videoEnabled,
+      audioEnabled: participantData.audioEnabled,
+      screenSharing: false,
       connectionQuality: 'good',
       joinedAt: new Date()
     };
 
-    this.participants.set(data.userId, participant);
+    this.participants.set(participantData.userId, participant);
     this.emit('participant-joined', { participant });
-  }
 
-  private handleUserLeft(data: any): void {
-    this.participants.delete(data.userId);
-    this.remoteStreams.delete(data.userId);
-    this.peerConnectionManager.closeConnection(data.userId);
-    this.emit('participant-left', { participantId: data.userId });
-  }
-
-  private async handleOffer(data: any): Promise<void> {
-    // Handle WebRTC offer from another participant - REAL IMPLEMENTATION
-    console.log('🎥 REAL WebRTC: Processing offer from participant:', data.fromUserId);
-    await this.peerConnectionManager.handleOffer(data.fromUserId, data.offer);
-    console.log('✅ Successfully processed WebRTC offer');
-  }
-
-  private async handleAnswer(data: any): Promise<void> {
-    // Handle WebRTC answer from another participant - REAL IMPLEMENTATION
-    console.log('🎥 REAL WebRTC: Processing answer from participant:', data.fromUserId);
-    await this.peerConnectionManager.handleAnswer(data.fromUserId, data.answer);
-    console.log('✅ Successfully processed WebRTC answer');
-  }
-
-  private async handleIceCandidate(data: any): Promise<void> {
-    // Handle ICE candidate from another participant - REAL IMPLEMENTATION
-    console.log('🎥 REAL WebRTC: Processing ICE candidate from participant:', data.fromUserId);
-    await this.peerConnectionManager.handleIceCandidate(data.fromUserId, data.candidate);
-  }
-
-  private handleRemoteStream(data: any): void {
-    console.log('🎥 REAL WebRTC: Remote video stream received from participant:', data.participantId);
-    this.remoteStreams.set(data.participantId, data.stream);
+    // Create peer connection
+    await this.createPeerConnection(participantData.userId);
     
-    // This is the actual remote video/audio stream that will be displayed
-    console.log('📺 Stream has video tracks:', data.stream.getVideoTracks().length);
-    console.log('🎤 Stream has audio tracks:', data.stream.getAudioTracks().length);
-    
-    this.emit('remote-stream-added', {
-      participantId: data.participantId,
-      stream: data.stream
+    // If we're the host or existing participant, send offer
+    if (this.session.userRole === 'host') {
+      await this.createOffer(participantData.userId);
+    }
+  }
+
+  // Create WebRTC peer connection
+  private async createPeerConnection(participantId: string): Promise<RTCPeerConnection> {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        ...this.config.stunServers!.map(url => ({ urls: url })),
+        ...this.config.turnServers!
+      ]
+    });
+
+    // Add local stream tracks
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        pc.addTrack(track, this.localStream!);
+      });
+    }
+
+    // Handle remote stream
+    pc.ontrack = (event) => {
+      console.log('🎬 Received remote stream from:', participantId);
+      const [remoteStream] = event.streams;
+      this.remoteStreams.set(participantId, remoteStream);
+      this.emit('remote-stream', { participantId, stream: remoteStream });
+    };
+
+    // Handle ICE candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.sendSignalingMessage('ice-candidate', {
+          candidate: event.candidate,
+          targetId: participantId
+        });
+      }
+    };
+
+    // Handle connection state
+    pc.onconnectionstatechange = () => {
+      console.log('🔗 Connection state with', participantId, ':', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        const participant = this.participants.get(participantId);
+        if (participant) {
+          participant.connectionQuality = 'excellent';
+          this.emit('participant-updated', { participant });
+        }
+      }
+    };
+
+    this.peerConnections.set(participantId, pc);
+    return pc;
+  }
+
+  // Create and send offer
+  private async createOffer(participantId: string): Promise<void> {
+    const pc = this.peerConnections.get(participantId);
+    if (!pc) return;
+
+    try {
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      
+      await pc.setLocalDescription(offer);
+      
+      this.sendSignalingMessage('offer', {
+        offer,
+        targetId: participantId
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to create offer:', error);
+    }
+  }
+
+  // Handle received offer
+  private async handleOffer(payload: any): Promise<void> {
+    if (!this.session || payload.targetId !== this.session.userId) return;
+
+    const pc = this.peerConnections.get(payload.fromId);
+    if (!pc) return;
+
+    try {
+      await pc.setRemoteDescription(payload.offer);
+      
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      
+      this.sendSignalingMessage('answer', {
+        answer,
+        targetId: payload.fromId
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to handle offer:', error);
+    }
+  }
+
+  // Handle received answer
+  private async handleAnswer(payload: any): Promise<void> {
+    if (!this.session || payload.targetId !== this.session.userId) return;
+
+    const pc = this.peerConnections.get(payload.fromId);
+    if (!pc) return;
+
+    try {
+      await pc.setRemoteDescription(payload.answer);
+    } catch (error) {
+      console.error('❌ Failed to handle answer:', error);
+    }
+  }
+
+  // Handle ICE candidate
+  private async handleIceCandidate(payload: any): Promise<void> {
+    if (!this.session || payload.targetId !== this.session.userId) return;
+
+    const pc = this.peerConnections.get(payload.fromId);
+    if (!pc) return;
+
+    try {
+      await pc.addIceCandidate(payload.candidate);
+    } catch (error) {
+      console.error('❌ Failed to handle ICE candidate:', error);
+    }
+  }
+
+  // Send signaling message
+  private sendSignalingMessage(event: string, payload: any): void {
+    if (!this.session) return;
+
+    this.supabase.channel(`room:${this.session.roomId}`).send({
+      type: 'broadcast',
+      event,
+      payload: {
+        ...payload,
+        fromId: this.session.userId
+      }
     });
   }
 
-  private handleConnectionStateChange(data: any): void {
-    const participant = this.participants.get(data.participantId);
-    if (participant) {
-      participant.connectionQuality = data.quality;
-      this.emit('connection-quality-changed', {
-        participantId: data.participantId,
-        quality: data.quality
+  // Join room in database
+  private async joinRoomInDatabase(): Promise<void> {
+    if (!this.session) return;
+
+    const { error } = await this.supabase
+      .from('video_room_participants')
+      .insert({
+        room_id: this.session.roomId,
+        user_id: this.session.userId,
+        display_name: this.session.displayName,
+        role: this.session.userRole,
+        joined_at: new Date().toISOString()
       });
+
+    if (error) {
+      console.error('❌ Failed to join room in database:', error);
     }
   }
 
-  private handleChatMessage(data: any): void {
-    this.emit('chat-message-received', data);
-  }
-
-  private handleScreenShareStarted(data: any): void {
-    this.emit('screen-share-started', data);
-  }
-
-  private handleScreenShareStopped(data: any): void {
-    this.emit('screen-share-stopped', data);
-  }
-
-  private handleQualityChanged(data: any): void {
-    this.emit('stream-quality-changed', data);
-  }
-
-  /**
-   * Handle ICE candidate from peer connection
-   */
-  private async handlePeerIceCandidate(data: any): Promise<void> {
-    const { participantId, candidate } = data;
-    console.log('🎥 REAL WebRTC: Sending ICE candidate to participant:', participantId);
-    await this.signalingManager.sendIceCandidate(participantId, candidate);
-  }
-
-  /**
-   * Handle answer created by peer connection
-   */
-  private async handleAnswerCreated(data: any): Promise<void> {
-    const { participantId, answer } = data;
-    console.log('🎥 REAL WebRTC: Sending answer to participant:', participantId);
-    await this.signalingManager.sendAnswer(participantId, answer);
-  }
-
-  /**
-   * Initiate peer connection with participant
-   */
-  async connectToParticipant(participantId: string): Promise<void> {
-    try {
-      console.log('🎥 REAL WebRTC: Initiating connection to participant:', participantId);
-      
-      // Create peer connection
-      await this.peerConnectionManager.createPeerConnection(participantId, this.localStream || undefined);
-      
-      // Create and send offer
-      const offer = await this.peerConnectionManager.createOffer(participantId);
-      await this.signalingManager.sendOffer(participantId, offer);
-      
-      console.log('✅ Successfully initiated WebRTC connection');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
-      console.error('❌ Error connecting to participant:', errorMessage);
-      this.emit('sdk-error', { error: errorMessage });
+  // Handle participant leaving
+  private handleParticipantLeft(participantId: string): void {
+    // Close peer connection
+    const pc = this.peerConnections.get(participantId);
+    if (pc) {
+      pc.close();
+      this.peerConnections.delete(participantId);
     }
+
+    // Remove streams and participant
+    this.remoteStreams.delete(participantId);
+    this.participants.delete(participantId);
+    
+    this.emit('participant-left', { participantId });
   }
 
-  /**
-   * Cleanup and destroy SDK instance
-   */
-  async destroy(): Promise<void> {
+  // Toggle video
+  async toggleVideo(enabled?: boolean): Promise<boolean> {
+    if (!this.localStream) return false;
+
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (!videoTrack) return false;
+
+    const newState = enabled !== undefined ? enabled : !this.isVideoEnabled;
+    videoTrack.enabled = newState;
+    this.isVideoEnabled = newState;
+
+    this.emit('video-toggled', { enabled: newState });
+    return newState;
+  }
+
+  // Toggle audio
+  async toggleAudio(enabled?: boolean): Promise<boolean> {
+    if (!this.localStream) return false;
+
+    const audioTrack = this.localStream.getAudioTracks()[0];
+    if (!audioTrack) return false;
+
+    const newState = enabled !== undefined ? enabled : !this.isAudioEnabled;
+    audioTrack.enabled = newState;
+    this.isAudioEnabled = newState;
+
+    this.emit('audio-toggled', { enabled: newState });
+    return newState;
+  }
+
+  // Start screen sharing
+  async startScreenShare(): Promise<MediaStream | null> {
     try {
-      if (this.isConnected) {
-        await this.leaveRoom();
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+
+      // Replace video track in all peer connections
+      const videoTrack = screenStream.getVideoTracks()[0];
+      for (const [participantId, pc] of this.peerConnections) {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(videoTrack);
+        }
       }
 
-      // Cleanup managers
-      this.signalingManager?.disconnect();
-      this.mediaManager?.cleanup?.();
-      this.peerConnectionManager?.cleanup();
-      this.chatManager?.cleanup?.();
-      this.screenShareManager?.cleanup?.();
-      this.whiteboardManager?.cleanup?.();
-      this.recordingManager?.cleanup?.();
-      this.moderatorManager?.cleanup?.();
-      this.streamQualityManager?.cleanup?.();
-
-      this.participants.clear();
-      this.remoteStreams.clear();
-      this.removeAllListeners();
-
-      this.isInitialized = false;
-      this.isConnected = false;
-      this.session = null;
-
+      this.isScreenSharing = true;
+      this.emit('screen-share-started', { stream: screenStream });
+      return screenStream;
+      
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('sdk-error', { error: errorMsg });
+      console.error('❌ Failed to start screen share:', error);
+      return null;
     }
   }
-}
 
-export default VideoSDK;
+  // Stop screen sharing
+  async stopScreenShare(): Promise<void> {
+    if (!this.localStream) return;
+
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    
+    // Replace screen track with camera track in all peer connections
+    for (const [participantId, pc] of this.peerConnections) {
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && videoTrack) {
+        await sender.replaceTrack(videoTrack);
+      }
+    }
+
+    this.isScreenSharing = false;
+    this.emit('screen-share-stopped');
+  }
+
+  // Leave room
+  async leaveRoom(): Promise<void> {
+    console.log('🚪 Leaving room...');
+
+    // Close all peer connections
+    for (const [participantId, pc] of this.peerConnections) {
+      pc.close();
+    }
+    this.peerConnections.clear();
+
+    // Stop local media
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream = null;
+    }
+
+    // Leave database room
+    if (this.session) {
+      await this.supabase
+        .from('video_room_participants')
+        .delete()
+        .eq('room_id', this.session.roomId)
+        .eq('user_id', this.session.userId);
+    }
+
+    // Clear state
+    this.participants.clear();
+    this.remoteStreams.clear();
+    this.session = null;
+    this.isConnected = false;
+
+    this.emit('disconnected');
+  }
+
+  // Getters
+  getLocalStream(): MediaStream | null {
+    return this.localStream;
+  }
+
+  getParticipants(): ParticipantInfo[] {
+    return Array.from(this.participants.values());
+  }
+
+  getRemoteStream(participantId: string): MediaStream | null {
+    return this.remoteStreams.get(participantId) || null;
+  }
+
+  isVideoEnabledState(): boolean {
+    return this.isVideoEnabled;
+  }
+
+  isAudioEnabledState(): boolean {
+    return this.isAudioEnabled;
+  }
+
+  isScreenSharingState(): boolean {
+    return this.isScreenSharing;
+  }
+
+  isConnectedState(): boolean {
+    return this.isConnected;
+  }
+
+  // Cleanup
+  async destroy(): Promise<void> {
+    await this.leaveRoom();
+  }
+}
