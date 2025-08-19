@@ -58,12 +58,12 @@ function LiveClassContent() {
   } = useVideoSDK();
 
   // Get class ID from URL params
-  const classId = new URLSearchParams(window.location.search).get('id') || '33333333-3333-3333-3333-333333333333';
+  const classId = new URLSearchParams(window.location.search).get('id');
   
   // Fetch specific class data
   const { data: classData, isLoading: classLoading } = useQuery({
     queryKey: ['/api/live-class', classId],
-    queryFn: () => getLiveClassById(classId),
+    queryFn: () => classId ? getLiveClassById(classId) : Promise.resolve(null),
     enabled: !!classId,
   });
 
@@ -75,20 +75,8 @@ function LiveClassContent() {
 
   const dataLoading = classLoading || allClassesLoading;
 
-  // Use specific class data - NO FALLBACK TO DEMO DATA
-  const selectedClass = classData || (allClasses && allClasses[0]) || {
-    id: '33333333-3333-3333-3333-333333333333',
-    title_bn: 'আরবি হরফ পরিচয়',
-    title: 'Arabic Letter Introduction',
-    description_bn: 'আরবি ভাষার মূল হরফগুলির সাথে পরিচয় এবং সঠিক উচ্চারণ শিখুন',
-    description: 'Learn the basic Arabic letters and their correct pronunciation',
-    scheduled_at: new Date().toISOString(),
-    duration: 90,
-    max_participants: 50,
-    current_participants: 12,
-    instructor_name: 'উস্তাদ আহমেদ',
-    status: 'scheduled'
-  };
+  // Use specific class data or first available class
+  const selectedClass = classData || (allClasses && allClasses[0]);
   
   // Show loading state while checking authentication
   if (authLoading) {
@@ -178,7 +166,7 @@ function LiveClassContent() {
     try {
       // Ensure selectedClass exists
       if (!selectedClass) {
-        throw new Error('No class data available');
+        throw new Error('No class data available - please select a class first');
       }
       
       // Create or get video room - REAL FUNCTIONALITY
@@ -189,9 +177,9 @@ function LiveClassContent() {
       // Create room in database - REAL DATABASE OPERATIONS
       try {
         await createVideoRoom({
-          name: selectedClass.title_bn || selectedClass.title,
-          description: selectedClass.description_bn || selectedClass.description,
-          host_user_id: user.id || '',
+          name: selectedClass.title_bn || selectedClass.title || 'Live Class',
+          description: selectedClass.description_bn || selectedClass.description || 'Arabic Learning Session',
+          host_user_id: user.id!,
           max_participants: selectedClass.max_participants || 100,
           is_public: true,
           scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),
