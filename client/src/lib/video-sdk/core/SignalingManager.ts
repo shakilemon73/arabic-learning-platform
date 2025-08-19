@@ -53,16 +53,47 @@ export class SignalingManager extends EventEmitter {
       this.roomId = roomId;
       this.userId = userId;
 
-      // Demo mode - simulate successful connection without Supabase real-time
-      console.log('SignalingManager: Demo mode - simulating connection');
-      
-      // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Create real-time channel for this room
+      this.channel = this.supabase.channel(`video-room-${roomId}`, {
+        config: {
+          broadcast: { self: true }
+        }
+      });
 
-      this.isConnected = true;
-      this.emit('connected', { roomId, userId });
-      
-      console.log('SignalingManager: Successfully connected in demo mode');
+      // Set up real-time event listeners
+      this.channel
+        .on('broadcast', { event: 'signaling' }, (payload) => {
+          this.handleSignalingMessage(payload.payload as SignalingMessage);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          const users = this.channel!.presenceState();
+          this.emit('users-changed', { users });
+        })
+        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+          this.emit('user-joined', { userId: key, presence: newPresences[0] });
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+          this.emit('user-left', { userId: key, presence: leftPresences[0] });
+        });
+
+      // Subscribe to the channel
+      const response = await this.channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track user presence
+          await this.channel!.track({
+            userId: this.userId,
+            online_at: new Date().toISOString()
+          });
+          
+          this.isConnected = true;
+          this.emit('connected', { roomId, userId });
+          console.log('SignalingManager: Successfully connected to real-time channel');
+        }
+      });
+
+      if (response === 'CHANNEL_ERROR') {
+        throw new Error('Failed to subscribe to signaling channel');
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown signaling error';
@@ -183,54 +214,66 @@ export class SignalingManager extends EventEmitter {
   }
 
   /**
-   * Send signaling message
+   * Send signaling message through the channel
    */
   private async sendSignalingMessage(message: SignalingMessage): Promise<void> {
-    if (!this.channel) {
-      throw new Error('Signaling channel not connected');
+    if (!this.channel || !this.isConnected) {
+      throw new Error('Not connected to signaling channel');
     }
 
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'signaling',
-      payload: message
-    });
+    try {
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'signaling',
+        payload: message
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send signaling message';
+      this.emit('error', { error: errorMessage });
+      throw error;
+    }
   }
 
   /**
    * Handle incoming signaling messages
    */
   private handleSignalingMessage(message: SignalingMessage): void {
-    // Ignore messages from self
-    if (message.fromUserId === this.userId) {
-      return;
-    }
+    // Don't process messages from ourselves
+    if (message.fromUserId === this.userId) return;
 
-    // Only process messages intended for this user or broadcast messages
-    if (message.toUserId && message.toUserId !== this.userId) {
-      return;
-    }
-
+    // Emit appropriate events based on message type
     switch (message.type) {
       case 'offer':
-        this.emit('offer', {
+        this.emit('offer-received', {
           fromUserId: message.fromUserId,
           offer: message.payload.offer
         });
         break;
-
+      
       case 'answer':
-        this.emit('answer', {
+        this.emit('answer-received', {
           fromUserId: message.fromUserId,
           answer: message.payload.answer
         });
         break;
-
+      
       case 'ice-candidate':
-        this.emit('ice-candidate', {
+        this.emit('ice-candidate-received', {
           fromUserId: message.fromUserId,
-          candidate: new RTCIceCandidate(message.payload.candidate)
+          candidate: message.payload.candidate
         });
+        break;
+      
+      case 'user-joined':
+        this.emit('participant-joined', message.payload as UserJoinedData);
+        break;
+      
+      case 'user-left':
+        this.emit('participant-left', message.payload as UserLeftData);
+        break;
+      
+      case 'media-state-change':
+        this.emit('media-state-changed', message.payload as MediaStateData);
         break;
     }
   }

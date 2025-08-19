@@ -240,16 +240,18 @@ export class VideoSDK extends EventEmitter {
   }
 
   private setupEventListeners(): void {
-    // Signaling events
-    this.signalingManager.on('user-joined', this.handleUserJoined.bind(this));
-    this.signalingManager.on('user-left', this.handleUserLeft.bind(this));
-    this.signalingManager.on('offer', this.handleOffer.bind(this));
-    this.signalingManager.on('answer', this.handleAnswer.bind(this));
-    this.signalingManager.on('ice-candidate', this.handleIceCandidate.bind(this));
+    // Signaling events - Real WebRTC implementation
+    this.signalingManager.on('offer-received', this.handleOffer.bind(this));
+    this.signalingManager.on('answer-received', this.handleAnswer.bind(this));
+    this.signalingManager.on('ice-candidate-received', this.handleIceCandidate.bind(this));
+    this.signalingManager.on('participant-joined', this.handleUserJoined.bind(this));
+    this.signalingManager.on('participant-left', this.handleUserLeft.bind(this));
 
-    // Peer connection events
+    // Peer connection events - Real WebRTC streams
     this.peerConnectionManager.on('remote-stream', this.handleRemoteStream.bind(this));
     this.peerConnectionManager.on('connection-state-change', this.handleConnectionStateChange.bind(this));
+    this.peerConnectionManager.on('ice-candidate', this.handlePeerIceCandidate.bind(this));
+    this.peerConnectionManager.on('answer-created', this.handleAnswerCreated.bind(this));
 
     // Chat events
     this.chatManager.on('message-received', this.handleChatMessage.bind(this));
@@ -677,22 +679,33 @@ export class VideoSDK extends EventEmitter {
   }
 
   private async handleOffer(data: any): Promise<void> {
-    // Handle WebRTC offer from another participant
+    // Handle WebRTC offer from another participant - REAL IMPLEMENTATION
+    console.log('🎥 REAL WebRTC: Processing offer from participant:', data.fromUserId);
     await this.peerConnectionManager.handleOffer(data.fromUserId, data.offer);
+    console.log('✅ Successfully processed WebRTC offer');
   }
 
   private async handleAnswer(data: any): Promise<void> {
-    // Handle WebRTC answer from another participant
+    // Handle WebRTC answer from another participant - REAL IMPLEMENTATION
+    console.log('🎥 REAL WebRTC: Processing answer from participant:', data.fromUserId);
     await this.peerConnectionManager.handleAnswer(data.fromUserId, data.answer);
+    console.log('✅ Successfully processed WebRTC answer');
   }
 
   private async handleIceCandidate(data: any): Promise<void> {
-    // Handle ICE candidate from another participant
+    // Handle ICE candidate from another participant - REAL IMPLEMENTATION
+    console.log('🎥 REAL WebRTC: Processing ICE candidate from participant:', data.fromUserId);
     await this.peerConnectionManager.handleIceCandidate(data.fromUserId, data.candidate);
   }
 
   private handleRemoteStream(data: any): void {
+    console.log('🎥 REAL WebRTC: Remote video stream received from participant:', data.participantId);
     this.remoteStreams.set(data.participantId, data.stream);
+    
+    // This is the actual remote video/audio stream that will be displayed
+    console.log('📺 Stream has video tracks:', data.stream.getVideoTracks().length);
+    console.log('🎤 Stream has audio tracks:', data.stream.getAudioTracks().length);
+    
     this.emit('remote-stream-added', {
       participantId: data.participantId,
       stream: data.stream
@@ -724,6 +737,45 @@ export class VideoSDK extends EventEmitter {
 
   private handleQualityChanged(data: any): void {
     this.emit('stream-quality-changed', data);
+  }
+
+  /**
+   * Handle ICE candidate from peer connection
+   */
+  private async handlePeerIceCandidate(data: any): Promise<void> {
+    const { participantId, candidate } = data;
+    console.log('🎥 REAL WebRTC: Sending ICE candidate to participant:', participantId);
+    await this.signalingManager.sendIceCandidate(participantId, candidate);
+  }
+
+  /**
+   * Handle answer created by peer connection
+   */
+  private async handleAnswerCreated(data: any): Promise<void> {
+    const { participantId, answer } = data;
+    console.log('🎥 REAL WebRTC: Sending answer to participant:', participantId);
+    await this.signalingManager.sendAnswer(participantId, answer);
+  }
+
+  /**
+   * Initiate peer connection with participant
+   */
+  async connectToParticipant(participantId: string): Promise<void> {
+    try {
+      console.log('🎥 REAL WebRTC: Initiating connection to participant:', participantId);
+      
+      // Create peer connection
+      await this.peerConnectionManager.createPeerConnection(participantId, this.localStream || undefined);
+      
+      // Create and send offer
+      const offer = await this.peerConnectionManager.createOffer(participantId);
+      await this.signalingManager.sendOffer(participantId, offer);
+      
+      console.log('✅ Successfully initiated WebRTC connection');
+    } catch (error) {
+      console.error('❌ Error connecting to participant:', error);
+      this.emit('sdk-error', { error: error.message });
+    }
   }
 
   /**

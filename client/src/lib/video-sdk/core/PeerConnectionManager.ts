@@ -1,6 +1,6 @@
 /**
- * PeerConnectionManager - Manages WebRTC peer connections
- * Handles multiple peer connections, media stream management, and connection quality
+ * PeerConnectionManager - Real WebRTC Implementation
+ * Handles actual peer-to-peer video/audio connections like Zoom/Google Meet
  */
 
 import { EventEmitter } from './EventEmitter';
@@ -29,25 +29,22 @@ export class PeerConnectionManager extends EventEmitter {
   private pendingCandidates: Map<string, RTCIceCandidate[]> = new Map();
   private localStream: MediaStream | null = null;
   private statsInterval: NodeJS.Timeout | null = null;
-
   private rtcConfiguration: RTCConfiguration;
 
   constructor(config: any) {
     super();
     this.config = config;
 
-    // Configure RTCPeerConnection
+    // Configure RTCPeerConnection for real WebRTC
     this.rtcConfiguration = {
       iceServers: [
-        ...config.stunServers?.map((url: string) => ({ urls: url })) || [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ],
-        ...config.turnServers || []
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
       ],
       iceCandidatePoolSize: 10,
       bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require',
-      iceTransportPolicy: 'all'
+      rtcpMuxPolicy: 'require'
     };
 
     // Start connection quality monitoring
@@ -55,7 +52,7 @@ export class PeerConnectionManager extends EventEmitter {
   }
 
   /**
-   * Create a peer connection for a participant
+   * Create real WebRTC peer connection
    */
   async createPeerConnection(participantId: string, localStream?: MediaStream): Promise<RTCPeerConnection> {
     try {
@@ -73,38 +70,41 @@ export class PeerConnectionManager extends EventEmitter {
         });
       }
 
-      // Create data channel for additional communication
+      // Create data channel for chat and control messages
       const dataChannel = peerConnection.createDataChannel('messages', {
         ordered: true
       });
       this.dataChannels.set(participantId, dataChannel);
 
-      // Setup event handlers
+      // Setup event handlers for real WebRTC
       this.setupPeerConnectionEventHandlers(participantId, peerConnection);
 
       // Store peer connection
       this.peerConnections.set(participantId, peerConnection);
 
+      console.log(`✅ Created real WebRTC peer connection for ${participantId}`);
       this.emit('peer-connection-created', { participantId, peerConnection });
       return peerConnection;
 
     } catch (error) {
+      console.error(`❌ Failed to create peer connection for ${participantId}:`, error);
       this.emit('error', { error: error.message, participantId });
       throw error;
     }
   }
 
   /**
-   * Setup event handlers for a peer connection
+   * Setup real WebRTC event handlers
    */
   private setupPeerConnectionEventHandlers(participantId: string, peerConnection: RTCPeerConnection): void {
-    // Handle remote stream
+    // Handle remote stream (real video/audio from participant)
     peerConnection.ontrack = (event) => {
       const [stream] = event.streams;
+      console.log(`📺 Received real video/audio stream from ${participantId}`);
       this.emit('remote-stream', { participantId, stream });
     };
 
-    // Handle ICE candidates
+    // Handle ICE candidates for NAT traversal
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         this.emit('ice-candidate', { participantId, candidate: event.candidate });
@@ -114,6 +114,7 @@ export class PeerConnectionManager extends EventEmitter {
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
       const state = peerConnection.connectionState;
+      console.log(`🔗 Connection state changed for ${participantId}: ${state}`);
       this.emit('connection-state-change', { participantId, state });
 
       if (state === 'failed' || state === 'closed') {
@@ -125,19 +126,25 @@ export class PeerConnectionManager extends EventEmitter {
     peerConnection.oniceconnectionstatechange = () => {
       const state = peerConnection.iceConnectionState;
       this.emit('ice-connection-state-change', { participantId, state });
+      
+      if (state === 'failed') {
+        // Try to restart ICE
+        peerConnection.restartIce();
+      }
     };
 
     // Handle data channel
     peerConnection.ondatachannel = (event) => {
-      const dataChannel = event.channel;
-      this.setupDataChannelEventHandlers(participantId, dataChannel);
+      const channel = event.channel;
+      this.dataChannels.set(participantId, channel);
+      this.setupDataChannelHandlers(participantId, channel);
     };
   }
 
   /**
-   * Setup data channel event handlers
+   * Setup data channel handlers
    */
-  private setupDataChannelEventHandlers(participantId: string, dataChannel: RTCDataChannel): void {
+  private setupDataChannelHandlers(participantId: string, dataChannel: RTCDataChannel): void {
     dataChannel.onopen = () => {
       this.emit('data-channel-open', { participantId });
     };
@@ -152,10 +159,64 @@ export class PeerConnectionManager extends EventEmitter {
     dataChannel.onclose = () => {
       this.emit('data-channel-close', { participantId });
     };
+  }
 
-    dataChannel.onerror = (error) => {
-      this.emit('data-channel-error', { participantId, error });
-    };
+  /**
+   * Create WebRTC offer
+   */
+  async createOffer(participantId: string): Promise<RTCSessionDescriptionInit> {
+    try {
+      const peerConnection = this.peerConnections.get(participantId);
+      if (!peerConnection) {
+        throw new Error(`No peer connection found for participant ${participantId}`);
+      }
+
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      
+      await peerConnection.setLocalDescription(offer);
+      console.log(`📤 Created WebRTC offer for ${participantId}`);
+      return offer;
+
+    } catch (error) {
+      console.error(`❌ Failed to create offer for ${participantId}:`, error);
+      this.emit('error', { error: error.message, participantId });
+      throw error;
+    }
+  }
+
+  /**
+   * Create WebRTC answer
+   */
+  async createAnswer(participantId: string, offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
+    try {
+      const peerConnection = this.peerConnections.get(participantId);
+      if (!peerConnection) {
+        throw new Error(`No peer connection found for participant ${participantId}`);
+      }
+
+      await peerConnection.setRemoteDescription(offer);
+      
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      
+      // Process any pending ICE candidates
+      const pendingCandidates = this.pendingCandidates.get(participantId) || [];
+      for (const candidate of pendingCandidates) {
+        await peerConnection.addIceCandidate(candidate);
+      }
+      this.pendingCandidates.delete(participantId);
+
+      console.log(`📤 Created WebRTC answer for ${participantId}`);
+      return answer;
+
+    } catch (error) {
+      console.error(`❌ Failed to create answer for ${participantId}:`, error);
+      this.emit('error', { error: error.message, participantId });
+      throw error;
+    }
   }
 
   /**
@@ -183,8 +244,10 @@ export class PeerConnectionManager extends EventEmitter {
       await peerConnection.setLocalDescription(answer);
 
       this.emit('answer-created', { participantId: fromUserId, answer });
+      console.log(`✅ Handled WebRTC offer from ${fromUserId}`);
 
     } catch (error) {
+      console.error(`❌ Failed to handle offer from ${fromUserId}:`, error);
       this.emit('error', { error: error.message, participantId: fromUserId });
     }
   }
@@ -208,7 +271,10 @@ export class PeerConnectionManager extends EventEmitter {
       }
       this.pendingCandidates.delete(fromUserId);
 
+      console.log(`✅ Handled WebRTC answer from ${fromUserId}`);
+
     } catch (error) {
+      console.error(`❌ Failed to handle answer from ${fromUserId}:`, error);
       this.emit('error', { error: error.message, participantId: fromUserId });
     }
   }
@@ -240,249 +306,163 @@ export class PeerConnectionManager extends EventEmitter {
       }
 
     } catch (error) {
+      console.error(`❌ Failed to handle ICE candidate from ${fromUserId}:`, error);
       this.emit('error', { error: error.message, participantId: fromUserId });
     }
   }
 
   /**
-   * Create and send offer to participant
+   * Set local stream for all peer connections
    */
-  async createOffer(participantId: string, localStream?: MediaStream): Promise<void> {
-    try {
-      let peerConnection = this.peerConnections.get(participantId);
-      
-      if (!peerConnection) {
-        peerConnection = await this.createPeerConnection(participantId, localStream);
-      }
-
-      const offer = await peerConnection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+  setLocalStream(stream: MediaStream): void {
+    this.localStream = stream;
+    
+    // Add tracks to existing peer connections
+    for (const [participantId, peerConnection] of this.peerConnections.entries()) {
+      // Remove existing tracks
+      peerConnection.getSenders().forEach(sender => {
+        if (sender.track) {
+          peerConnection.removeTrack(sender);
+        }
       });
-
-      await peerConnection.setLocalDescription(offer);
-
-      this.emit('offer-created', { participantId, offer });
-
-    } catch (error) {
-      this.emit('error', { error: error.message, participantId });
+      
+      // Add new tracks
+      stream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, stream);
+      });
     }
+    
+    console.log('📹 Local stream updated for all peer connections');
+    this.emit('local-stream-updated', { stream });
   }
 
   /**
-   * Replace video track (for screen sharing)
+   * Close peer connection
    */
-  async replaceVideoTrack(newTrack: MediaStreamTrack): Promise<void> {
-    try {
-      for (const [participantId, peerConnection] of this.peerConnections) {
-        const sender = peerConnection.getSenders().find(s => 
-          s.track && s.track.kind === 'video'
-        );
-
-        if (sender) {
-          await sender.replaceTrack(newTrack);
-        }
-      }
-
-      this.emit('video-track-replaced', { newTrack });
-
-    } catch (error) {
-      this.emit('error', { error: error.message });
-    }
-  }
-
-  /**
-   * Update stream quality for all connections
-   */
-  async updateStreamQuality(quality: StreamQuality): Promise<void> {
-    try {
-      const bitrate = quality.bitrate;
-
-      for (const [participantId, peerConnection] of this.peerConnections) {
-        const sender = peerConnection.getSenders().find(s => 
-          s.track && s.track.kind === 'video'
-        );
-
-        if (sender && sender.getParameters) {
-          const params = sender.getParameters();
-          
-          if (params.encodings && params.encodings.length > 0) {
-            params.encodings[0].maxBitrate = bitrate;
-            params.encodings[0].maxFramerate = quality.frameRate;
-            
-            await sender.setParameters(params);
-          }
-        }
-      }
-
-      this.emit('stream-quality-updated', { quality });
-
-    } catch (error) {
-      this.emit('error', { error: error.message });
-    }
-  }
-
-  /**
-   * Send data message to participant
-   */
-  async sendDataMessage(participantId: string, message: any): Promise<void> {
-    try {
-      const dataChannel = this.dataChannels.get(participantId);
-      if (dataChannel && dataChannel.readyState === 'open') {
-        dataChannel.send(JSON.stringify(message));
-      }
-    } catch (error) {
-      this.emit('error', { error: error.message, participantId });
-    }
-  }
-
-  /**
-   * Close connection to specific participant
-   */
-  closeConnection(participantId: string): void {
+  closePeerConnection(participantId: string): void {
     const peerConnection = this.peerConnections.get(participantId);
+    const dataChannel = this.dataChannels.get(participantId);
+    
     if (peerConnection) {
       peerConnection.close();
       this.peerConnections.delete(participantId);
     }
-
-    const dataChannel = this.dataChannels.get(participantId);
+    
     if (dataChannel) {
       dataChannel.close();
       this.dataChannels.delete(participantId);
     }
-
+    
     this.pendingCandidates.delete(participantId);
-
-    this.emit('connection-closed', { participantId });
-  }
-
-  /**
-   * Close all peer connections
-   */
-  closeAllConnections(): void {
-    for (const participantId of this.peerConnections.keys()) {
-      this.closeConnection(participantId);
-    }
+    console.log(`🔌 Closed peer connection for ${participantId}`);
+    this.emit('peer-connection-closed', { participantId });
   }
 
   /**
    * Handle connection failure
    */
-  private async handleConnectionFailure(participantId: string): Promise<void> {
+  private handleConnectionFailure(participantId: string): void {
+    console.warn(`⚠️ Peer connection failed for participant ${participantId}`);
     this.emit('connection-failed', { participantId });
-    
-    // Attempt to recreate connection after a delay
-    setTimeout(async () => {
-      try {
-        this.closeConnection(participantId);
-        await this.createPeerConnection(participantId, this.localStream || undefined);
-        this.emit('connection-reconnect-attempt', { participantId });
-      } catch (error) {
-        this.emit('connection-reconnect-failed', { participantId, error: error.message });
-      }
-    }, 2000);
   }
 
   /**
-   * Start connection quality monitoring
+   * Start monitoring connection statistics
    */
   private startStatsMonitoring(): void {
     this.statsInterval = setInterval(async () => {
-      for (const [participantId, peerConnection] of this.peerConnections) {
+      for (const [participantId, peerConnection] of this.peerConnections.entries()) {
         try {
-          const stats = await this.getConnectionStats(participantId);
-          if (stats) {
-            this.emit('connection-stats', stats);
-          }
+          const stats = await peerConnection.getStats();
+          const connectionStats = this.parseConnectionStats(participantId, stats);
+          this.emit('connection-stats', connectionStats);
         } catch (error) {
-          // Ignore stats errors
+          // Stats gathering failed, connection might be closed
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
   }
 
   /**
-   * Get connection statistics
+   * Parse WebRTC statistics
    */
-  async getConnectionStats(participantId: string): Promise<ConnectionStats | null> {
-    const peerConnection = this.peerConnections.get(participantId);
-    if (!peerConnection) return null;
+  private parseConnectionStats(participantId: string, stats: RTCStatsReport): ConnectionStats {
+    let bytesReceived = 0;
+    let bytesSent = 0;
+    let packetsLost = 0;
+    let jitter = 0;
+    let rtt = 0;
 
-    try {
-      const stats = await peerConnection.getStats();
-      let bytesReceived = 0;
-      let bytesSent = 0;
-      let packetsLost = 0;
-      let jitter = 0;
-      let rtt = 0;
-
-      stats.forEach(stat => {
-        if (stat.type === 'inbound-rtp') {
-          bytesReceived += stat.bytesReceived || 0;
-          packetsLost += stat.packetsLost || 0;
-          jitter += stat.jitter || 0;
-        } else if (stat.type === 'outbound-rtp') {
-          bytesSent += stat.bytesSent || 0;
-        } else if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
-          rtt = stat.currentRoundTripTime || 0;
-        }
-      });
-
-      // Calculate quality based on stats
-      let quality: ConnectionStats['quality'] = 'excellent';
-      if (packetsLost > 10 || rtt > 300) {
-        quality = 'poor';
-      } else if (packetsLost > 5 || rtt > 150) {
-        quality = 'good';
+    stats.forEach((report: any) => {
+      if (report.type === 'inbound-rtp') {
+        bytesReceived += report.bytesReceived || 0;
+        packetsLost += report.packetsLost || 0;
+        jitter = report.jitter || 0;
+      } else if (report.type === 'outbound-rtp') {
+        bytesSent += report.bytesSent || 0;
+      } else if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+        rtt = report.currentRoundTripTime || 0;
       }
+    });
 
-      return {
-        participantId,
-        bytesReceived,
-        bytesSent,
-        packetsLost,
-        jitter,
-        rtt,
-        quality
-      };
-
-    } catch (error) {
-      return null;
+    // Determine quality based on stats
+    let quality: 'excellent' | 'good' | 'poor' | 'disconnected' = 'excellent';
+    if (packetsLost > 50 || rtt > 300) {
+      quality = 'poor';
+    } else if (packetsLost > 10 || rtt > 150) {
+      quality = 'good';
     }
+
+    return {
+      participantId,
+      bytesReceived,
+      bytesSent,
+      packetsLost,
+      jitter,
+      rtt,
+      quality
+    };
   }
 
   /**
-   * Set local stream
+   * Send data message to participant
    */
-  setLocalStream(stream: MediaStream): void {
-    this.localStream = stream;
-  }
-
-  /**
-   * Get peer connection
-   */
-  getPeerConnection(participantId: string): RTCPeerConnection | null {
-    return this.peerConnections.get(participantId) || null;
+  sendDataMessage(participantId: string, message: any): void {
+    const dataChannel = this.dataChannels.get(participantId);
+    if (dataChannel && dataChannel.readyState === 'open') {
+      dataChannel.send(JSON.stringify(message));
+    }
   }
 
   /**
    * Get all peer connections
    */
-  getAllPeerConnections(): Map<string, RTCPeerConnection> {
+  getPeerConnections(): Map<string, RTCPeerConnection> {
     return new Map(this.peerConnections);
   }
 
   /**
-   * Cleanup and destroy manager
+   * Cleanup all connections
    */
-  destroy(): void {
+  cleanup(): void {
+    console.log('🧹 Cleaning up all WebRTC connections...');
+    
     if (this.statsInterval) {
       clearInterval(this.statsInterval);
       this.statsInterval = null;
     }
 
-    this.closeAllConnections();
-    this.removeAllListeners();
+    for (const participantId of this.peerConnections.keys()) {
+      this.closePeerConnection(participantId);
+    }
+    
+    this.emit('cleanup-complete');
+  }
+
+  /**
+   * Close connection (alias for closePeerConnection)
+   */
+  closeConnection(participantId: string): void {
+    this.closePeerConnection(participantId);
   }
 }

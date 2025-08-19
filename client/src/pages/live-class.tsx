@@ -13,7 +13,7 @@ import { getLiveClasses, getLiveClassById } from '@/lib/api';
 import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
 import { VideoConference } from '@/components/video-sdk/VideoConference';
 import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
-import LiveClassroom from '@/components/LiveClassroom';
+
 
 // Video SDK Configuration
 const VIDEO_SDK_CONFIG = {
@@ -239,15 +239,53 @@ function LiveClassContent() {
     }
   };
 
-  // Show real Jitsi video conference if class is active
-  if (isClassActive) {
+  // Show real VideoSDK conference if connected
+  if (isClassActive && isConnected) {
     return (
-      <LiveClassroom
-        sessionId={roomId || selectedClass?.id || 'default'}
-        isInstructor={isInstructor}
-        classTitle={selectedClass?.title_bn || selectedClass?.title || 'Arabic Learning Class'}
-        userId={user?.id || 'user'}
-      />
+      <div className="h-screen flex flex-col bg-gray-900">
+        {/* Arabic Learning Class Header */}
+        <div className="bg-islamic-green text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="p-2 bg-white/20 rounded-lg mr-4">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold font-bengali">{selectedClass?.title_bn || selectedClass?.title || 'লাইভ ক্লাস'}</h1>
+              <p className="text-sm opacity-75 font-bengali">
+                {isInstructor ? 'শিক্ষক' : 'শিক্ষার্থী'} • {participants.length + 1} জন অংশগ্রহণকারী
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+              <Clock className="w-4 h-4 mr-1" />
+              লাইভ ক্লাস
+            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLeaveClass}
+              className="bg-white/10 text-white border-white/30 hover:bg-white/20 font-bengali"
+            >
+              ক্লাস ছেড়ে দিন
+            </Button>
+          </div>
+        </div>
+
+        {/* Real VideoSDK Conference */}
+        <div className="flex-1">
+          <VideoConference
+            showChat={showChat}
+            onChatToggle={() => setShowChat(!showChat)}
+          />
+        </div>
+
+        {/* Class-specific bottom bar */}
+        <div className="bg-islamic-green/90 text-white px-4 py-2 text-sm text-center font-bengali">
+          আজকের বিষয়: আরবি হরফের পরিচয় ও উচ্চারণ • সময়কাল: {selectedClass?.duration || 90} মিনিট
+        </div>
+      </div>
     );
   }
 
