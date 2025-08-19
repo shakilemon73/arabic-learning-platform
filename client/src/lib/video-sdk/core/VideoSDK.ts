@@ -175,7 +175,7 @@ export class VideoSDK extends EventEmitter {
       },
       translationConfig: {
         languages: ['en', 'ar', 'es', 'fr', 'de', 'zh', 'ja', 'hi', 'bn'],
-        provider: 'kudo' as 'kudo',
+        provider: 'kudo',
         voiceToVoice: true
       },
       metaverseConfig: {
@@ -184,8 +184,8 @@ export class VideoSDK extends EventEmitter {
         environments: ['cairo-classroom', 'damascus-library', 'mecca-study-circle']
       },
       arabicLearningConfig: {
-        dialect: 'MSA' as 'MSA',
-        focus: 'quranic' as 'quranic',
+        dialect: 'MSA',
+        focus: 'quranic',
         pronunciationCoaching: true,
         tajweedAnalysis: true
       },
@@ -374,7 +374,7 @@ export class VideoSDK extends EventEmitter {
       });
 
       // Cleanup connections
-      this.peerConnectionManager.closeAllConnections();
+      this.peerConnectionManager.cleanup();
       this.participants.clear();
       this.remoteStreams.clear();
 
@@ -773,8 +773,9 @@ export class VideoSDK extends EventEmitter {
       
       console.log('✅ Successfully initiated WebRTC connection');
     } catch (error) {
-      console.error('❌ Error connecting to participant:', error);
-      this.emit('sdk-error', { error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      console.error('❌ Error connecting to participant:', errorMessage);
+      this.emit('sdk-error', { error: errorMessage });
     }
   }
 
@@ -789,14 +790,14 @@ export class VideoSDK extends EventEmitter {
 
       // Cleanup managers
       this.signalingManager?.disconnect();
-      this.mediaManager?.destroy();
-      this.peerConnectionManager?.destroy();
-      this.chatManager?.destroy();
-      this.screenShareManager?.destroy();
-      this.whiteboardManager?.destroy();
-      this.recordingManager?.destroy();
-      this.moderatorManager?.destroy();
-      this.streamQualityManager?.destroy();
+      this.mediaManager?.cleanup?.();
+      this.peerConnectionManager?.cleanup();
+      this.chatManager?.cleanup?.();
+      this.screenShareManager?.cleanup?.();
+      this.whiteboardManager?.cleanup?.();
+      this.recordingManager?.cleanup?.();
+      this.moderatorManager?.cleanup?.();
+      this.streamQualityManager?.cleanup?.();
 
       this.participants.clear();
       this.remoteStreams.clear();

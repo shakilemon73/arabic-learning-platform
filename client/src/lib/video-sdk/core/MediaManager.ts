@@ -128,163 +128,91 @@ export class MediaManager extends EventEmitter {
   }
 
   /**
-   * Switch camera device
+   * Get screen share stream
    */
-  async switchCamera(deviceId: string): Promise<MediaStream | null> {
+  async getScreenShare(): Promise<MediaStream> {
     try {
-      this.selectedDevices.camera = deviceId;
-      
-      if (this.currentStream) {
-        // Stop current video track
-        const videoTrack = this.currentStream.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTrack.stop();
-          this.currentStream.removeTrack(videoTrack);
-        }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { mediaSource: 'screen' },
+        audio: true
+      });
 
-        // Get new video track with selected device
-        const newVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: deviceId } }
-        });
-        
-        const newVideoTrack = newVideoStream.getVideoTracks()[0];
-        this.currentStream.addTrack(newVideoTrack);
-
-        this.emit('camera-switched', { deviceId, stream: this.currentStream });
-        return this.currentStream;
-      }
-      
-      return null;
+      this.emit('screen-share-acquired', { stream });
+      return stream;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Screen share denied';
       this.emit('error', { error: errorMessage });
-      return null;
+      throw error;
     }
   }
 
   /**
-   * Switch microphone device
-   */
-  async switchMicrophone(deviceId: string): Promise<MediaStream | null> {
-    try {
-      this.selectedDevices.microphone = deviceId;
-      
-      if (this.currentStream) {
-        // Stop current audio track
-        const audioTrack = this.currentStream.getAudioTracks()[0];
-        if (audioTrack) {
-          audioTrack.stop();
-          this.currentStream.removeTrack(audioTrack);
-        }
-
-        // Get new audio track with selected device
-        const newAudioStream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: { exact: deviceId } }
-        });
-        
-        const newAudioTrack = newAudioStream.getAudioTracks()[0];
-        this.currentStream.addTrack(newAudioTrack);
-
-        this.emit('microphone-switched', { deviceId, stream: this.currentStream });
-        return this.currentStream;
-      }
-      
-      return null;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      this.emit('error', { error: errorMessage });
-      return null;
-    }
-  }
-
-  /**
-   * Get available media devices
-   */
-  getAvailableDevices(): MediaDevice[] {
-    return this.availableDevices;
-  }
-
-  /**
-   * Get cameras
-   */
-  getCameras(): MediaDevice[] {
-    return this.availableDevices.filter(device => device.kind === 'videoinput');
-  }
-
-  /**
-   * Get microphones
-   */
-  getMicrophones(): MediaDevice[] {
-    return this.availableDevices.filter(device => device.kind === 'audioinput');
-  }
-
-  /**
-   * Get speakers
-   */
-  getSpeakers(): MediaDevice[] {
-    return this.availableDevices.filter(device => device.kind === 'audiooutput');
-  }
-
-  /**
-   * Set speaker device (for audio output)
-   */
-  async setSpeaker(deviceId: string, audioElement?: HTMLAudioElement): Promise<void> {
-    try {
-      this.selectedDevices.speaker = deviceId;
-      
-      if (audioElement && 'setSinkId' in audioElement) {
-        await (audioElement as any).setSinkId(deviceId);
-        this.emit('speaker-switched', { deviceId });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      this.emit('error', { error: errorMessage });
-    }
-  }
-
-  /**
-   * Update available devices list
+   * Update available devices
    */
   private async updateAvailableDevices(): Promise<void> {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      this.availableDevices = devices.map(device => ({
-        deviceId: device.deviceId,
-        label: device.label || `${device.kind} (${device.deviceId.slice(0, 8)})`,
-        kind: device.kind as 'videoinput' | 'audioinput' | 'audiooutput'
-      }));
+      this.availableDevices = devices
+        .filter(device => device.kind !== 'audiooutput' || device.deviceId !== 'default')
+        .map(device => ({
+          deviceId: device.deviceId,
+          label: device.label || `${device.kind} ${device.deviceId.slice(0, 8)}`,
+          kind: device.kind as 'videoinput' | 'audioinput' | 'audiooutput'
+        }));
 
       this.emit('devices-updated', { devices: this.availableDevices });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to enumerate devices';
       this.emit('error', { error: errorMessage });
     }
   }
 
   /**
-   * Handle device change events
+   * Handle device change event
    */
-  private async handleDeviceChange(): Promise<void> {
-    await this.updateAvailableDevices();
-    this.emit('device-change', { devices: this.availableDevices });
+  private handleDeviceChange(): void {
+    this.updateAvailableDevices();
   }
 
   /**
-   * Stop all media tracks
+   * Set selected devices
    */
-  stopAllTracks(): void {
+  setSelectedDevices(devices: { camera?: string; microphone?: string; speaker?: string }): void {
+    this.selectedDevices = { ...this.selectedDevices, ...devices };
+    this.emit('devices-selected', { devices: this.selectedDevices });
+  }
+
+  /**
+   * Get available devices
+   */
+  getAvailableDevices(): MediaDevice[] {
+    return [...this.availableDevices];
+  }
+
+  /**
+   * Get current stream
+   */
+  getCurrentStream(): MediaStream | null {
+    return this.currentStream;
+  }
+
+  /**
+   * Stop current stream
+   */
+  stopCurrentStream(): void {
     if (this.currentStream) {
       this.currentStream.getTracks().forEach(track => track.stop());
       this.currentStream = null;
+      this.emit('stream-stopped');
     }
   }
 
   /**
    * Cleanup media manager
    */
-  destroy(): void {
-    this.stopAllTracks();
-    navigator.mediaDevices.removeEventListener('devicechange', this.handleDeviceChange.bind(this));
+  cleanup(): void {
+    this.stopCurrentStream();
+    navigator.mediaDevices.removeEventListener('devicechange', this.handleDeviceChange);
     this.removeAllListeners();
   }
 }

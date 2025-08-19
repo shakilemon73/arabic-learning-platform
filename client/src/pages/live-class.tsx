@@ -190,7 +190,7 @@ function LiveClassContent() {
         await createVideoRoom({
           name: selectedClass.title_bn || selectedClass.title,
           description: selectedClass.description_bn || selectedClass.description,
-          host_user_id: user.id ?? 'default-user',
+          host_user_id: user.id || 'default-user',
           max_participants: selectedClass.max_participants || 100,
           is_public: true,
           scheduled_start_time: selectedClass.scheduled_at ? new Date(selectedClass.scheduled_at) : new Date(),

@@ -39,46 +39,23 @@ export type { ConnectionStats } from './core/PeerConnectionManager';
 // Chat Management
 export { ChatManager } from './core/ChatManager';
 export type { 
-  ChatMessage, 
-  ChatReaction, 
-  SendMessageData, 
-  ChatSettings 
+  ChatMessage
 } from './core/ChatManager';
 
 // Screen Sharing
 export { ScreenShareManager } from './core/ScreenShareManager';
-export type { ScreenShareOptions } from './core/ScreenShareManager';
 
 // Interactive Whiteboard
 export { WhiteboardManager } from './core/WhiteboardManager';
-export type { 
-  DrawingAction, 
-  WhiteboardSettings 
-} from './core/WhiteboardManager';
 
 // Recording
 export { RecordingManager } from './core/RecordingManager';
-export type { 
-  RecordingConfig, 
-  Recording 
-} from './core/RecordingManager';
 
 // Moderation
 export { ModeratorManager } from './core/ModeratorManager';
-export type { 
-  ModeratorAction, 
-  ModerationRequest, 
-  ParticipantPermissions, 
-  RoomSettings 
-} from './core/ModeratorManager';
 
 // Stream Quality
 export { StreamQualityManager } from './core/StreamQualityManager';
-export type { 
-  QualityProfile, 
-  NetworkStats, 
-  AdaptiveSettings 
-} from './core/StreamQualityManager';
 
 // SDK Version
 export const SDK_VERSION = '1.0.0';

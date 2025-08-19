@@ -91,7 +91,7 @@ export class SignalingManager extends EventEmitter {
         }
       });
 
-      if (response === 'CHANNEL_ERROR') {
+      if (response !== 'SUBSCRIBED') {
         throw new Error('Failed to subscribe to signaling channel');
       }
 

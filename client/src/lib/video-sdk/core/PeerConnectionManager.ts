@@ -87,8 +87,9 @@ export class PeerConnectionManager extends EventEmitter {
       return peerConnection;
 
     } catch (error) {
-      console.error(`❌ Failed to create peer connection for ${participantId}:`, error);
-      this.emit('error', { error: error.message, participantId });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`❌ Failed to create peer connection for ${participantId}:`, errorMessage);
+      this.emit('error', { error: errorMessage, participantId });
       throw error;
     }
   }
@@ -464,5 +465,64 @@ export class PeerConnectionManager extends EventEmitter {
    */
   closeConnection(participantId: string): void {
     this.closePeerConnection(participantId);
+  }
+
+  /**
+   * Replace video track for screen sharing or camera switching
+   */
+  async replaceVideoTrack(newTrack: MediaStreamTrack): Promise<void> {
+    try {
+      for (const [participantId, peerConnection] of this.peerConnections) {
+        const sender = peerConnection.getSenders().find(s => 
+          s.track && s.track.kind === 'video'
+        );
+
+        if (sender) {
+          await sender.replaceTrack(newTrack);
+          console.log(`🔄 Replaced video track for participant ${participantId}`);
+        }
+      }
+
+      this.emit('video-track-replaced', { newTrack });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Failed to replace video track:', errorMessage);
+      this.emit('error', { error: errorMessage });
+    }
+  }
+
+  /**
+   * Update stream quality for all connections (bitrate, resolution)
+   */
+  async updateStreamQuality(quality: { bitrate: number; frameRate: number }): Promise<void> {
+    try {
+      const bitrate = quality.bitrate;
+
+      for (const [participantId, peerConnection] of this.peerConnections) {
+        const sender = peerConnection.getSenders().find(s => 
+          s.track && s.track.kind === 'video'
+        );
+
+        if (sender && sender.getParameters) {
+          const params = sender.getParameters();
+          
+          if (params.encodings && params.encodings.length > 0) {
+            params.encodings[0].maxBitrate = bitrate;
+            params.encodings[0].maxFramerate = quality.frameRate;
+            
+            await sender.setParameters(params);
+          }
+        }
+      }
+
+      this.emit('stream-quality-updated', { quality });
+      console.log(`📊 Updated stream quality: ${bitrate}kbps, ${quality.frameRate}fps`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Failed to update stream quality:', errorMessage);
+      this.emit('error', { error: errorMessage });
+    }
   }
 }
