@@ -47,6 +47,9 @@ export default function Dashboard() {
     queryKey: ['/api/live-classes'],
     queryFn: () => getLiveClasses(),
   });
+  
+  // Debug: Show what classes are loaded from your Supabase
+  console.log('🏠 Dashboard classes from Supabase:', upcomingClasses);
 
   const isLoading = authLoading || profileLoading || attendanceLoading || classesLoading;
 

@@ -79,10 +79,12 @@ export const getLiveClasses = async (): Promise<LiveClassWithDetails[]> => {
       )
     `)
     .eq('is_active', true)
-    .gte('scheduled_at', new Date().toISOString())
     .order('scheduled_at');
     
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching live classes:', error);
+    throw error;
+  }
   return data || [];
 };
 

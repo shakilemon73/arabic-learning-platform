@@ -75,8 +75,12 @@ function LiveClassContent() {
 
   const dataLoading = classLoading || allClassesLoading;
 
-  // Use specific class data or first available class
+  // Use specific class data or first available class from your Supabase
   const selectedClass = classData || (allClasses && allClasses[0]);
+  
+  // Debug: Log what we're getting from Supabase
+  console.log('📚 Classes from Supabase:', allClasses);
+  console.log('🎯 Selected class:', selectedClass);
   
   // Show loading state while checking authentication
   if (authLoading) {
