@@ -106,6 +106,7 @@ export class VideoSDK extends EventEmitter {
       ...config
     };
 
+    // Initialize synchronously - don't set isInitialized until async init completes
     try {
       this.supabase = createClient(config.supabaseUrl, config.supabaseKey, {
         auth: {
@@ -123,10 +124,47 @@ export class VideoSDK extends EventEmitter {
       this.wsSignaling = new WebSocketSignalingManager();
       this.setupWebSocketSignaling();
       
-      this.isInitialized = true;
+      console.log('🚀 VideoSDK constructor completed successfully');
     } catch (error) {
       console.error('🔒 VideoSDK initialization failed:', error);
       throw new Error('Failed to initialize VideoSDK with provided configuration');
+    }
+  }
+
+  /**
+   * Async initialization method - must be called after construction
+   */
+  async initialize(): Promise<void> {
+    try {
+      console.log('🔄 Starting VideoSDK async initialization...');
+      
+      // Test Supabase connection
+      const { error } = await this.supabase.from('rooms').select('count').limit(1);
+      if (error && error.code !== 'PGRST116') { // PGRST116 is just "no rows" which is fine
+        console.warn('⚠️ Supabase connection test warning:', error.message);
+      }
+      
+      // Connect WebSocket signaling if needed
+      try {
+        if (this.wsSignaling && typeof this.wsSignaling.connect === 'function') {
+          await this.wsSignaling.connect();
+          console.log('✅ WebSocket signaling connected');
+        } else {
+          console.log('⏭️ WebSocket signaling not available, using Supabase only');
+        }
+      } catch (wsError) {
+        console.warn('⚠️ WebSocket connection failed, using Supabase only:', wsError);
+        // Continue without WebSocket - Supabase realtime can handle signaling
+      }
+      
+      this.isInitialized = true;
+      console.log('✅ VideoSDK fully initialized and ready');
+      this.emit('initialized');
+      
+    } catch (error) {
+      console.error('❌ VideoSDK async initialization failed:', error);
+      this.isInitialized = false;
+      throw new Error('Failed to complete VideoSDK initialization: ' + (error as Error).message);
     }
   }
 

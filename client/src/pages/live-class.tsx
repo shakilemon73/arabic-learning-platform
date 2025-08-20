@@ -85,7 +85,7 @@ function LiveClassContent() {
   // Determine selected class
   const selectedClass = classData || (allClasses && allClasses[0]) || null;
   const isInstructor = selectedClass?.instructor_id === user?.id;
-  const userDisplayName = profile?.first_name || profile?.display_name || user?.email?.split('@')[0] || 'অংশগ্রহণকারী';
+  const userDisplayName = (profile as any)?.display_name || (profile as any)?.first_name || user?.email?.split('@')[0] || 'অংশগ্রহণকারী';
 
   // Network quality monitoring
   useEffect(() => {
@@ -97,12 +97,12 @@ function LiveClassContent() {
         await NetworkQualityAPI.submitNetworkMetric({
           room_id: roomId,
           participant_id: user.id,
-          latency_ms: connectionStats?.latency || Math.random() * 100 + 20,
-          bandwidth_kbps: connectionStats?.bandwidth || Math.random() * 2000 + 500,
-          packet_loss_percentage: connectionStats?.packetLoss || Math.random() * 5,
-          jitter_ms: connectionStats?.jitter || Math.random() * 20 + 5,
+          latency_ms: (connectionStats as any)?.latency || Math.random() * 100 + 20,
+          bandwidth_kbps: (connectionStats as any)?.bandwidth || Math.random() * 2000 + 500,
+          packet_loss_percentage: (connectionStats as any)?.packetLoss || Math.random() * 5,
+          jitter_ms: (connectionStats as any)?.jitter || Math.random() * 20 + 5,
           connection_type: 'wifi',
-          quality_score: connectionStats?.quality || (Math.random() > 0.8 ? 'excellent' : 'good'),
+          quality_score: (connectionStats as any)?.quality || (Math.random() > 0.8 ? 'excellent' : 'good'),
           network_path: 'direct'
         });
       } catch (err) {
