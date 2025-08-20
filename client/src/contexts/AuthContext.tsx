@@ -78,18 +78,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🔍 Fetching user profile for:', userId);
       
-      // Try user_profiles table first
+      // Try users table first (correct table name)
       let { data, error } = await supabase
-        .from('user_profiles')
+        .from('users')
         .select('*')
         .eq('id', userId)
         .single();
 
-      // If user_profiles table doesn't exist, try users table
-      if (error && error.code === '42P01') {
-        console.log('🔄 Trying users table instead...');
+      // If users table doesn't exist, try user_profiles table as fallback
+      if (error && error.code === 'PGRST205') {
+        console.log('🔄 Trying user_profiles table instead...');
         const result = await supabase
-          .from('users')
+          .from('user_profiles')
           .select('*')
           .eq('id', userId)
           .single();
