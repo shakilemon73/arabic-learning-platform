@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import Header from '@/components/Header';
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
-  const { signIn, resetPassword, loading } = useAuth();
+  const { signIn, resetPassword, loading, user } = useAuth();
   
   // Form state
   const [formData, setFormData] = useState({
@@ -28,6 +28,23 @@ export default function LoginPage() {
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Reset form state when user changes (important for after logout)
+  useEffect(() => {
+    if (user) {
+      // User is logged in, redirect to dashboard
+      setLocation('/dashboard');
+    } else {
+      // User is not logged in, reset form state
+      setFormData({ email: '', password: '' });
+      setErrors({});
+      setIsSubmitting(false);
+      setIsResettingPassword(false);
+      setShowResetForm(false);
+      setResetEmail('');
+      setShowPassword(false);
+    }
+  }, [user, setLocation]);
 
   // Form validation
   const validateForm = () => {
@@ -62,12 +79,13 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent double submission
-    if (isSubmitting || loading) return;
+    // Prevent double submission, but allow retry if auth loading is stuck
+    if (isSubmitting) return;
     
     if (!validateForm()) return;
     
     setIsSubmitting(true);
+    setErrors({}); // Clear previous errors
     
     try {
       const { error } = await signIn(formData.email, formData.password);
@@ -81,6 +99,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Login error:', error);
+      setErrors({ general: 'লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।' });
     } finally {
       setIsSubmitting(false);
     }
@@ -222,7 +241,7 @@ export default function LoginPage() {
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className={`pl-10 ${errors.email ? 'border-destructive' : ''}`}
-                        disabled={isSubmitting || loading}
+                        disabled={isSubmitting}
                       />
                     </div>
                     {errors.email && (
@@ -241,7 +260,7 @@ export default function LoginPage() {
                         value={formData.password}
                         onChange={(e) => handleInputChange('password', e.target.value)}
                         className={`pl-10 pr-10 ${errors.password ? 'border-destructive' : ''}`}
-                        disabled={isSubmitting || loading}
+                        disabled={isSubmitting}
                       />
                       <Button
                         type="button"
@@ -249,7 +268,7 @@ export default function LoginPage() {
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
-                        disabled={isSubmitting || loading}
+                        disabled={isSubmitting}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
@@ -268,7 +287,7 @@ export default function LoginPage() {
                         setShowResetForm(true);
                         setErrors({});
                       }}
-                      disabled={isSubmitting || loading}
+                      disabled={isSubmitting}
                     >
                       পাসওয়ার্ড ভুলে গেছেন?
                     </Button>
@@ -277,9 +296,9 @@ export default function LoginPage() {
                   <Button 
                     type="submit" 
                     className="w-full bg-islamic-green hover:bg-dark-green"
-                    disabled={isSubmitting || loading}
+                    disabled={isSubmitting}
                   >
-                    {(isSubmitting || loading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     লগইন করুন
                   </Button>
                 </form>

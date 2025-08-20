@@ -322,16 +322,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setState(prev => ({ ...prev, loading: true }));
     
     try {
-      // Clear state immediately to prevent cache issues
-      setState(prev => ({
-        ...prev,
-        user: null,
-        profile: null,
-        session: null,
-        loading: true,
-        error: null
-      }));
-      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -344,15 +334,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { error };
       }
 
-      // Ensure complete cleanup
-      setState(prev => ({
-        ...prev,
+      // Force complete state cleanup after successful signOut
+      setState({
         user: null,
         profile: null,
         session: null,
         loading: false,
         error: null
-      }));
+      });
+      
+      // Also clear localStorage to prevent stale auth data
+      try {
+        localStorage.removeItem('sb-auth-token');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') || key.includes('supabase')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (storageError) {
+        console.warn('Error clearing auth storage:', storageError);
+      }
       
       toast({
         title: "সফলভাবে লগআউট হয়েছে",
@@ -500,18 +501,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('🔄 Auth hook received user change:', session?.user ? 'User present' : 'No user');
         console.log('🔄 Auth event:', event);
         
-        // Prevent duplicate state updates for the same session
+        // Handle different auth events with proper cleanup
         if (event === 'SIGNED_OUT') {
-          setState(prev => ({
-            ...prev,
+          console.log('🚪 User signed out - clearing all state');
+          setState({
             user: null,
             profile: null,
             session: null,
             loading: false,
             error: null,
-          }));
-        } else {
+          });
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           await updateAuthState(session?.user || null, session);
+        } else if (event === 'INITIAL_SESSION') {
+          // Handle initial session without causing loading state issues
+          if (session?.user) {
+            await updateAuthState(session.user, session);
+          } else {
+            setState(prev => ({
+              ...prev,
+              user: null,
+              profile: null,
+              session: null,
+              loading: false,
+              error: null,
+            }));
+          }
         }
       }
     );
