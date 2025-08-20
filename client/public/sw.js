@@ -50,51 +50,40 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Security: Validate request origin
-  if (!isValidOrigin(event.request.url)) {
-    console.warn('🚨 Blocked request to unauthorized origin:', event.request.url);
+  // CRITICAL FIX: Don't intercept authentication requests
+  const url = new URL(event.request.url);
+  
+  // Skip service worker for authentication-related requests
+  if (url.hostname.includes('supabase.co') || 
+      url.pathname.includes('/auth/') ||
+      url.pathname.includes('/rest/') ||
+      url.pathname.includes('/realtime/') ||
+      event.request.method !== 'GET') {
+    // Let these requests go through normally without any interference
     return;
   }
 
-  // Security: Enhanced fetch handling with proper headers
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Clone response for security headers
-        const responseToCache = response.clone();
-        
-        // Add security headers to responses
-        const secureResponse = new Response(responseToCache.body, {
-          status: responseToCache.status,
-          statusText: responseToCache.statusText,
-          headers: {
-            ...Object.fromEntries(responseToCache.headers.entries()),
-            'X-Frame-Options': 'DENY',
-            'X-Content-Type-Options': 'nosniff',
-            'X-XSS-Protection': '1; mode=block'
+  // Only handle static assets and page requests
+  if (event.request.destination === 'document' || 
+      event.request.destination === 'script' || 
+      event.request.destination === 'style' ||
+      event.request.destination === 'image') {
+    
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          // Simple offline fallback only for static resources
+          if (event.request.destination === 'document') {
+            return new Response('Offline - Please check your connection', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain' }
+            });
           }
-        });
-        
-        return response; // Return original response, not the modified one for compatibility
-      })
-      .catch((error) => {
-        console.warn('🔒 Service worker fetch failed:', error);
-        
-        // Enhanced offline fallback
-        return new Response(JSON.stringify({
-          error: 'আপনি অফলাইনে আছেন / You are offline',
-          message: 'দয়া করে আপনার ইন্টারনেট সংযোগ পরীক্ষা করুন / Please check your internet connection',
-          timestamp: new Date().toISOString()
-        }), {
-          status: 503,
-          statusText: 'Service Unavailable',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache'
-          }
-        });
-      })
-  );
+          // For other resources, just fail normally
+          throw new Error('Resource unavailable offline');
+        })
+    );
+  }
 });
 
 // Security: Enhanced message handling with validation

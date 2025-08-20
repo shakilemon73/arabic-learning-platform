@@ -390,7 +390,7 @@ export class PeerConnectionManager extends EventEmitter {
    */
   private startStatsMonitoring(): void {
     this.statsInterval = setInterval(async () => {
-      for (const [participantId, peerConnection] of this.peerConnections.entries()) {
+      for (const [participantId, peerConnection] of Array.from(this.peerConnections.entries())) {
         try {
           const stats = await peerConnection.getStats();
           const connectionStats = this.parseConnectionStats(participantId, stats);

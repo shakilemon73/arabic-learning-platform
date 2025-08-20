@@ -2,48 +2,39 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-// Security: Enhanced service worker registration
-if ('serviceWorker' in navigator && 'https:' === window.location.protocol || window.location.hostname === 'localhost') {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('🔧 Secure cache management service registered');
-        
-        // Enhanced security: Validate service worker before sending messages
-        if (registration.active && registration.scope === window.location.origin + '/') {
-          registration.active.postMessage({ 
-            type: 'SELECTIVE_CACHE_CLEAR',
-            preserveAuth: true,
-            timestamp: Date.now()
-          });
-        }
-      })
-      .catch((error) => {
-        console.warn('Service worker registration failed:', error);
+// CRITICAL FIX: Disable service worker to prevent auth interference
+// Service worker was causing authentication issues by intercepting requests
+console.log('🔧 Service worker disabled to prevent authentication issues');
+
+// Optional: Unregister existing service worker if it exists
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister().then(() => {
+        console.log('🧹 Unregistered problematic service worker');
       });
+    });
   });
 }
 
-// Security: Controlled cache management - preserve authentication
+// CRITICAL FIX: Minimal cache management to prevent auth issues
 if ('caches' in window && import.meta.env.DEV) {
-  // Only perform cache clearing in development
+  // Only clear non-essential caches and avoid touching auth-related storage
   caches.keys().then((cacheNames) => {
-    // Preserve critical authentication and user data caches
-    const safeToDeleteCaches = cacheNames.filter(name => 
-      !name.includes('sb-auth') && 
-      !name.includes('supabase') && 
-      !name.includes('auth-token') &&
-      !name.includes('user-session') &&
-      !name.includes('workbox') // Preserve service worker caches
+    // Very conservative cache clearing - only clear obviously safe caches
+    const safeCaches = cacheNames.filter(name => 
+      name.includes('vite') || 
+      name.includes('assets') ||
+      (name.includes('workbox') && !name.includes('auth'))
     );
     
-    safeToDeleteCaches.forEach((cacheName) => {
+    safeCaches.forEach((cacheName) => {
       caches.delete(cacheName).catch(error => {
-        console.warn('Cache deletion failed:', cacheName, error);
+        console.warn('Safe cache deletion failed:', cacheName, error);
       });
     });
   }).catch(error => {
-    console.warn('Cache management failed:', error);
+    console.warn('Cache check failed:', error);
   });
 }
 
