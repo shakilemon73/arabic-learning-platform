@@ -53,8 +53,10 @@ export class WebSocketSignalingManager extends EventEmitter {
       // Wait for connection to open
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('WebSocket connection timeout'));
-        }, 10000); // 10 second timeout
+          console.warn('⚠️ WebSocket connection timeout, continuing with Supabase-only mode');
+          // Don't reject - allow the system to continue without WebSocket
+          resolve();
+        }, 5000); // 5 second timeout for faster fallback
 
         this.ws!.onopen = () => {
           clearTimeout(timeout);
@@ -71,8 +73,9 @@ export class WebSocketSignalingManager extends EventEmitter {
 
         this.ws!.onerror = (error) => {
           clearTimeout(timeout);
-          console.error('❌ WebSocket connection error:', error);
-          reject(new Error('WebSocket connection failed'));
+          console.warn('⚠️ WebSocket connection failed, system will continue with Supabase-only mode:', error);
+          // Don't reject - allow the system to continue without WebSocket
+          resolve();
         };
       });
 

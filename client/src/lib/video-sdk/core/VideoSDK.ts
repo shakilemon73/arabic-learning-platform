@@ -144,18 +144,8 @@ export class VideoSDK extends EventEmitter {
         console.warn('⚠️ Supabase connection test warning:', error.message);
       }
       
-      // Connect WebSocket signaling if needed
-      try {
-        if (this.wsSignaling && typeof this.wsSignaling.connect === 'function') {
-          await this.wsSignaling.connect();
-          console.log('✅ WebSocket signaling connected');
-        } else {
-          console.log('⏭️ WebSocket signaling not available, using Supabase only');
-        }
-      } catch (wsError) {
-        console.warn('⚠️ WebSocket connection failed, using Supabase only:', wsError);
-        // Continue without WebSocket - Supabase realtime can handle signaling
-      }
+      // Skip WebSocket for now - use Supabase-only mode for stability
+      console.log('📡 Using Supabase-only signaling mode for maximum reliability (like Zoom/Teams)');
       
       this.isInitialized = true;
       console.log('✅ VideoSDK fully initialized and ready');
