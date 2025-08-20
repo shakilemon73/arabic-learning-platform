@@ -443,13 +443,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     console.log('🔐 Initializing authentication system...');
     
-    // Get initial session
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    // Get initial session with retry mechanism for SPA reliability
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
+          
+          // Retry session recovery for SPA
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`🔄 Retrying session recovery (${retryCount}/${maxRetries})...`);
+            setTimeout(initializeAuth, 1000 * retryCount);
+            return;
+          }
+          
           setState(prev => ({ ...prev, loading: false, error }));
           return;
         }
@@ -463,6 +475,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        
+        // Retry on network/connection issues common in SPAs
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`🔄 Retrying due to network error (${retryCount}/${maxRetries})...`);
+          setTimeout(initializeAuth, 1000 * retryCount);
+          return;
+        }
+        
         setState(prev => ({ 
           ...prev, 
           loading: false, 

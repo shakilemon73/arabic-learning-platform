@@ -17,8 +17,42 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
     storageKey: 'sb-auth-token',
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined
-  }
+    storage: typeof window !== 'undefined' ? {
+      getItem: (key: string) => {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (error) {
+          console.warn('Error accessing localStorage:', error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (error) {
+          console.warn('Error setting localStorage:', error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          console.warn('Error removing from localStorage:', error);
+        }
+      }
+    } : undefined,
+    debug: import.meta.env.DEV
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web',
+    },
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 });
 
 // Auth helper functions

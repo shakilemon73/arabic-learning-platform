@@ -46,8 +46,24 @@ self.addEventListener('fetch', (event) => {
 // Listen for messages from main thread
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CLEAR_CACHE') {
+    // Legacy cache clearing - clear all caches
     caches.keys().then((cacheNames) => {
       cacheNames.forEach((cacheName) => {
+        caches.delete(cacheName);
+      });
+    });
+  } else if (event.data && event.data.type === 'SELECTIVE_CACHE_CLEAR') {
+    // Selective cache clearing - preserve authentication-related caches
+    caches.keys().then((cacheNames) => {
+      // Only clear non-auth related caches
+      const nonAuthCaches = cacheNames.filter(cacheName => 
+        !cacheName.includes('sb-auth') && 
+        !cacheName.includes('supabase') && 
+        !cacheName.includes('auth-token') &&
+        !cacheName.includes('session')
+      );
+      
+      nonAuthCaches.forEach((cacheName) => {
         caches.delete(cacheName);
       });
     });
