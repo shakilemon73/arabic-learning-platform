@@ -388,9 +388,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState({
         user: null,
         profile: null,
+        session: null,
         loading: false,
         error: null,
-        initialized: true
       });
 
       // Security: Log successful logout
@@ -417,9 +417,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState({
         user: null,
         profile: null,
+        session: null,
         loading: false,
         error: authError,
-        initialized: true
       });
       
       return { error: authError };
