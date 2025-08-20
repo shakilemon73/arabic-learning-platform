@@ -55,6 +55,7 @@ export class AdaptiveBitrateManager extends EventEmitter {
   private currentQualities = new Map<string, QualityLevel>();
   private adaptationHistory = new Map<string, AdaptationDecision[]>();
   private stabilityTimers = new Map<string, NodeJS.Timeout>();
+  private peerConnections: Map<string, RTCPeerConnection> = new Map();
 
   // Quality levels like professional platforms use
   private qualityLevels: QualityLevel[] = [
@@ -100,8 +101,19 @@ export class AdaptiveBitrateManager extends EventEmitter {
     }
   ];
 
-  constructor() {
+  constructor(peerConnections?: Map<string, RTCPeerConnection>) {
     super();
+    if (peerConnections) {
+      this.peerConnections = peerConnections;
+    }
+    console.log('📊 Initializing Professional Adaptive Bitrate Manager');
+  }
+
+  /**
+   * Update peer connections reference from VideoSDK
+   */
+  setPeerConnections(peerConnections: Map<string, RTCPeerConnection>): void {
+    this.peerConnections = peerConnections;
   }
 
   /**
@@ -192,7 +204,7 @@ export class AdaptiveBitrateManager extends EventEmitter {
       let connectionCount = 0;
 
       // Get stats from all active peer connections
-      for (const [participantId, peerConnection] of this.participantConnections.entries()) {
+      for (const [participantId, peerConnection] of Array.from(this.peerConnections.entries())) {
         const rtcStats = await peerConnection.getStats();
         
         rtcStats.forEach((report: any) => {

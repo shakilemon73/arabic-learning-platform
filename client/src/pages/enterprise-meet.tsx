@@ -123,6 +123,10 @@ export default function EnterpriseMeetPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  
+  // Video stream state for remote participants
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const participantVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Advanced Features State
@@ -151,8 +155,13 @@ export default function EnterpriseMeetPage() {
       // Create Supabase client
       const supabase = createClient(ENTERPRISE_CONFIG.supabaseUrl, ENTERPRISE_CONFIG.supabaseKey);
 
-      // Initialize Enterprise Video SDK
-      const enterpriseSDK = new EnterpriseVideoSDK(ENTERPRISE_CONFIG);
+      // Initialize Enterprise Video SDK with proper config
+      const enterpriseSDK = new EnterpriseVideoSDK({
+        ...ENTERPRISE_CONFIG,
+        enableSFU: true,
+        enableAudioProcessing: true,
+        enableNetworkResilience: true
+      });
       await enterpriseSDK.initialize();
       setVideoSDK(enterpriseSDK);
 
@@ -215,7 +224,7 @@ export default function EnterpriseMeetPage() {
       setAudioManager(audio);
 
       // 6. Adaptive Bitrate Manager (Smart quality adaptation)
-      const bitrate = new AdaptiveBitrateManager(user.id, new Map());
+      const bitrate = new AdaptiveBitrateManager();
       bitrate.startMonitoring();
       setBitrateManager(bitrate);
 
@@ -256,7 +265,79 @@ export default function EnterpriseMeetPage() {
         roomId,
         userId: user.id,
         displayName: (profile as any)?.display_name || user.email?.split('@')[0] || 'Enterprise User',
-        role: 'participant' // Let the system determine role based on room ownership
+        role: 'participant'
+      });
+
+      // Set up event handlers for real video streams
+      videoSDK.on('local-stream', (data) => {
+        console.log('📺 Local media stream received, setting up video display');
+        const stream = data.stream;
+        setLocalStream(stream);
+        if (stream && localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          console.log('✅ Local video stream connected to video element');
+        }
+      });
+
+      videoSDK.on('remote-stream', (data) => {
+        console.log('📺 Remote participant stream received:', data);
+        
+        // Store the remote stream
+        setRemoteStreams(prev => {
+          const newStreams = new Map(prev);
+          newStreams.set(data.participantId, data.stream);
+          return newStreams;
+        });
+        
+        // Update participants list with stream
+        setParticipants(prev => {
+          const updated = [...prev];
+          const participantIndex = updated.findIndex(p => p.id === data.participantId);
+          if (participantIndex >= 0) {
+            // Participant exists, just note that stream is available
+            console.log('🔄 Stream added for existing participant:', data.participantId);
+          } else {
+            // Add new participant with stream
+            updated.push({
+              id: data.participantId,
+              name: data.participantId,
+              role: 'participant',
+              videoEnabled: true,
+              audioEnabled: true,
+              screenSharing: false,
+              handRaised: false,
+              connectionQuality: 'excellent'
+            });
+          }
+          return updated;
+        });
+        
+        // Immediately connect the stream to video element if ref exists
+        const videoElement = participantVideoRefs.current.get(data.participantId);
+        if (videoElement && data.stream) {
+          videoElement.srcObject = data.stream;
+          console.log('✅ Connected remote stream to video element for:', data.participantId);
+        }
+      });
+
+      videoSDK.on('participant-joined', (data) => {
+        console.log('👥 Real participant joined:', data);
+        // Participant will be added when their stream arrives
+      });
+
+      videoSDK.on('participant-left', (data) => {
+        console.log('👋 Real participant left:', data);
+        setParticipants(prev => prev.filter(p => p.id !== data.participantId));
+        
+        // Remove their stream
+        setRemoteStreams(prev => {
+          const newStreams = new Map(prev);
+          newStreams.delete(data.participantId);
+          return newStreams;
+        });
+        
+        // Remove video ref
+        participantVideoRefs.current.delete(data.participantId);
       });
 
       // Add participant to Supabase database
@@ -880,18 +961,40 @@ export default function EnterpriseMeetPage() {
               </div>
 
               {/* Remote Participants */}
-              {participants.slice(1).map((participant) => (
-                <div 
-                  key={participant.id} 
-                  className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video group"
-                  data-testid={`video-participant-${participant.id}`}
-                >
-                  {/* Mock video or avatar */}
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600">
-                    <div className="text-4xl font-bold">
-                      {participant.name.charAt(0).toUpperCase()}
-                    </div>
-                  </div>
+              {participants.slice(1).map((participant) => {
+                const hasStream = remoteStreams.has(participant.id);
+                return (
+                  <div 
+                    key={participant.id} 
+                    className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video group"
+                    data-testid={`video-participant-${participant.id}`}
+                  >
+                    {hasStream ? (
+                      // Real video stream
+                      <video
+                        ref={(el) => {
+                          if (el) {
+                            participantVideoRefs.current.set(participant.id, el);
+                            const stream = remoteStreams.get(participant.id);
+                            if (stream) {
+                              el.srcObject = stream;
+                              console.log('✅ Connected stream to video element for:', participant.id);
+                            }
+                          }
+                        }}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover"
+                        data-testid={`video-stream-${participant.id}`}
+                      />
+                    ) : (
+                      // Fallback avatar while waiting for stream
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600">
+                        <div className="text-4xl font-bold">
+                          {participant.name.charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                    )}
                   
                   {/* Participant Info */}
                   <div className="absolute bottom-2 left-2 flex items-center space-x-1">
@@ -926,7 +1029,8 @@ export default function EnterpriseMeetPage() {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
