@@ -428,6 +428,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Reset password function
   const resetPassword = async (email: string) => {
+      
+      // Even if logout fails, clear local state
+      setState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: authError,
+        initialized: true
+      });
+      
+      return { error: authError };
+    }
+  };
+
+  // Reset password function
+  const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
       {

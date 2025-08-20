@@ -29,14 +29,17 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Reset form state when user changes (important for after logout)
+  // Critical fix: Handle authentication state changes properly
   useEffect(() => {
     if (user && !loading) {
       // User is authenticated and auth is not loading, redirect to dashboard
       console.log('🔄 Login: User authenticated, redirecting to dashboard');
-      setTimeout(() => setLocation('/dashboard'), 100); // Small delay to ensure state is stable
-    } else if (!user) {
-      // User is not logged in, reset form state
+      setTimeout(() => setLocation('/dashboard'), 100);
+    }
+    
+    // Reset form ONLY when component mounts or user becomes null after being logged in
+    if (!user && !loading) {
+      console.log('🔄 Login: Resetting form state');
       setFormData({ email: '', password: '' });
       setErrors({});
       setIsSubmitting(false);

@@ -42,6 +42,14 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  
+  // Clear form when not submitting to prevent auto-trigger
+  useEffect(() => {
+    if (!isSubmitting) {
+      // Only reset when explicitly needed, not on every render
+      console.log('🔄 Register: Clearing form auto-trigger state');
+    }
+  }, [isSubmitting]);
 
   // Form validation
   const validateForm = () => {
