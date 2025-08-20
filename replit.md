@@ -27,18 +27,21 @@ Preferred communication style: Simple, everyday language.
 ## Backend Architecture
 - **Framework**: Pure Supabase Backend-as-a-Service (BaaS) – no custom Express server.
 - **Authentication**: Supabase Auth with JWT tokens and secure session management.
-- **Database**: PostgreSQL via Supabase with real-time subscriptions and an enterprise schema.
-- **API Design**: Direct Supabase client calls from frontend using centralized API utilities.
+- **Database**: PostgreSQL via Supabase with real-time subscriptions and comprehensive enterprise video schema.
+- **API Design**: Direct Supabase client calls from frontend using centralized API utilities with URL and anon key.
+- **Enterprise Video**: Direct Supabase API integration for SFU management, recording sessions, network metrics, and participant tracking.
 - **Type Safety**: Custom TypeScript interfaces matching Supabase database schema (snake_case).
 - **Data Fetching**: TanStack Query for caching and state management.
-- **Video Infrastructure**: WebRTC with TURN servers and SFU architecture.
+- **Video Infrastructure**: WebRTC with TURN servers and SFU architecture backed by Supabase database.
 - **Deployment**: Vite-only frontend with Replit host configuration.
 
 ## Database Design
-- **Database**: PostgreSQL via Supabase with real-time capabilities.
-- **Schema**: Comprehensive tables for users, courses, live classes, instructors, attendance, and session storage.
-- **Features**: User progress tracking, payment status, course enrollment status, and attendance records.
-- **Real-time**: Supabase real-time subscriptions for live features.
+- **Database**: PostgreSQL via Supabase with real-time capabilities and enterprise video infrastructure.
+- **Core Schema**: Comprehensive tables for users, courses, live classes, instructors, attendance, and session storage.
+- **Enterprise Video Schema**: Advanced tables for SFU instances, recording sessions, network quality metrics, audio processing events, quality adaptations, performance alerts, and enterprise participant tracking.
+- **Integration Method**: Direct Supabase API calls using URL and anon key for all database operations.
+- **Features**: User progress tracking, payment status, course enrollment status, attendance records, and comprehensive video analytics.
+- **Real-time**: Supabase real-time subscriptions for live features and video conference updates.
 
 ## Payment Processing
 - **Provider**: Bangladeshi mobile banking (bKash, Nagad, Rocket) for course enrollment payments.

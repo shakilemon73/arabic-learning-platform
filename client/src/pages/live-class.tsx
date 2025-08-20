@@ -709,7 +709,7 @@ function LiveClassWithTabs({
             {/* Homework Submissions Section */}
             <div className="mb-6">
               <HomeworkSubmissions 
-                classId={classId} 
+                classId={classId || undefined} 
                 showSubmitForm={isClassActive}
               />
             </div>
