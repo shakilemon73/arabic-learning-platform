@@ -48,6 +48,18 @@ export { ScreenShareManager } from './core/ScreenShareManager';
 // Interactive Whiteboard
 export { WhiteboardManager } from './core/WhiteboardManager';
 
+// Breakout Rooms
+export { BreakoutRoomManager } from './core/BreakoutRoomManager';
+
+// Waiting Room
+export { WaitingRoomManager } from './core/WaitingRoomManager';
+
+// Interactions (Hand raising, polls, Q&A)
+export { InteractionManager } from './core/InteractionManager';
+
+// Virtual Backgrounds
+export { VirtualBackgroundManager } from './core/VirtualBackgroundManager';
+
 // Recording (Legacy)
 export { RecordingManager as LegacyRecordingManager } from './core/RecordingManager';
 

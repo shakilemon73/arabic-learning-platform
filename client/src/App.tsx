@@ -13,6 +13,7 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
+import EnterpriseMeet from "@/pages/enterprise-meet";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
@@ -43,6 +44,12 @@ function Router() {
       <Route path="/live-class">
         <AuthGuard>
           <LiveClass />
+        </AuthGuard>
+      </Route>
+      
+      <Route path="/enterprise-meet">
+        <AuthGuard>
+          <EnterpriseMeet />
         </AuthGuard>
       </Route>
       
