@@ -209,26 +209,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       if (user) {
         console.log('🔄 Auth state changed:', 'SIGNED_IN', 'User present');
-        const profile = await fetchUserProfile(user.id);
+        
+        // Set loading to false immediately to prevent UI blocking
         setState(prev => ({
           ...prev,
           user,
-          profile,
           session,
           loading: false,
           error: null,
         }));
+        
+        // Fetch profile separately and update
+        const profile = await fetchUserProfile(user.id);
+        setState(prev => ({
+          ...prev,
+          profile,
+        }));
       } else {
         console.log('🔄 Auth state changed:', 'SIGNED_OUT', 'No user');
         // Ensure complete cleanup on sign out
-        setState(prev => ({
-          ...prev,
+        setState({
           user: null,
           profile: null,
           session: null,
           loading: false,
           error: null,
-        }));
+        });
       }
     } catch (error) {
       console.error('Error updating auth state:', error);

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -121,6 +121,7 @@ export default function AuthGuard({
 }: AuthGuardProps) {
   const { user, profile, loading, error } = useAuth();
   const [, setLocation] = useLocation();
+  const [forceNoLoading, setForceNoLoading] = useState(false);
 
   // Auto-redirect if specified
   useEffect(() => {
@@ -129,14 +130,33 @@ export default function AuthGuard({
     }
   }, [loading, requireAuth, user, redirectTo, setLocation]);
 
+  // Force stop loading after timeout to prevent infinite loading loops
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (loading) {
+      timeoutId = setTimeout(() => {
+        console.log('⏰ AuthGuard: Loading timeout reached, forcing resolution');
+        setForceNoLoading(true);
+      }, 5000); // 5 second timeout
+    } else {
+      setForceNoLoading(false);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [loading]);
+
   console.log('🛡️ AuthGuard check:', {
     user: !!user,
     loading,
+    forceNoLoading,
     requireAuth
   });
 
-  // Show loading state
-  if (loading) {
+  // Show loading state (unless forced to stop)
+  if (loading && !forceNoLoading) {
     return fallback || <AuthLoadingSkeleton />;
   }
 

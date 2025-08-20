@@ -31,10 +31,11 @@ export default function LoginPage() {
 
   // Reset form state when user changes (important for after logout)
   useEffect(() => {
-    if (user) {
-      // User is logged in, redirect to dashboard
-      setLocation('/dashboard');
-    } else {
+    if (user && !loading) {
+      // User is authenticated and auth is not loading, redirect to dashboard
+      console.log('🔄 Login: User authenticated, redirecting to dashboard');
+      setTimeout(() => setLocation('/dashboard'), 100); // Small delay to ensure state is stable
+    } else if (!user) {
       // User is not logged in, reset form state
       setFormData({ email: '', password: '' });
       setErrors({});
@@ -44,7 +45,7 @@ export default function LoginPage() {
       setResetEmail('');
       setShowPassword(false);
     }
-  }, [user, setLocation]);
+  }, [user, loading, setLocation]);
 
   // Form validation
   const validateForm = () => {
@@ -91,11 +92,11 @@ export default function LoginPage() {
       const { error } = await signIn(formData.email, formData.password);
       
       if (!error) {
+        console.log('✅ Login successful, auth context should handle redirect');
+        // Don't manually redirect here - let the useEffect handle it after auth state updates
         // Clear form data and reset state
         setFormData({ email: '', password: '' });
         setErrors({});
-        // Successful login - redirect to dashboard
-        setLocation('/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
