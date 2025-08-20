@@ -164,29 +164,84 @@ export class AdaptiveBitrateManager extends EventEmitter {
     // In production, this would use WebRTC stats API
     // Simulating professional network measurement
     
-    // Get RTCPeerConnection stats (real implementation)
-    const mockStats = this.getMockNetworkStats();
+    // Get real RTCPeerConnection stats
+    const realStats = await this.getRealNetworkStats();
     
     return {
-      bandwidth: mockStats.availableBandwidth,
-      rtt: mockStats.roundTripTime,
-      packetLoss: mockStats.packetLossRate,
-      jitter: mockStats.jitter,
+      bandwidth: realStats.availableBandwidth,
+      rtt: realStats.roundTripTime,
+      packetLoss: realStats.packetLossRate,
+      jitter: realStats.jitter,
       timestamp: new Date()
     };
   }
 
   /**
-   * Mock network stats for demonstration
-   * In production, this uses real WebRTC stats
+   * Get real network stats from WebRTC connections
+   * Professional implementation using RTCStatsReport
    */
-  private getMockNetworkStats(): any {
-    return {
-      availableBandwidth: Math.random() * 3000000 + 500000, // 0.5-3.5 Mbps
-      roundTripTime: Math.random() * 200 + 50,              // 50-250ms
-      packetLossRate: Math.random() * 0.05,                 // 0-5% loss
-      jitter: Math.random() * 0.03                          // 0-30ms jitter
-    };
+  private async getRealNetworkStats(): Promise<any> {
+    try {
+      const stats = {
+        availableBandwidth: 0,
+        roundTripTime: 0,
+        packetLossRate: 0,
+        jitter: 0
+      };
+
+      let connectionCount = 0;
+
+      // Get stats from all active peer connections
+      for (const [participantId, peerConnection] of this.participantConnections.entries()) {
+        const rtcStats = await peerConnection.getStats();
+        
+        rtcStats.forEach((report: any) => {
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            if (report.availableOutgoingBitrate) {
+              stats.availableBandwidth += report.availableOutgoingBitrate;
+            }
+            if (report.currentRoundTripTime) {
+              stats.roundTripTime += report.currentRoundTripTime * 1000; // Convert to ms
+            }
+            connectionCount++;
+          }
+          
+          if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+            const totalPackets = (report.packetsReceived || 0) + (report.packetsLost || 0);
+            if (totalPackets > 0) {
+              stats.packetLossRate += (report.packetsLost || 0) / totalPackets;
+            }
+            if (report.jitter) {
+              stats.jitter += report.jitter;
+            }
+          }
+        });
+      }
+
+      // Average the stats if we have connections
+      if (connectionCount > 0) {
+        stats.roundTripTime /= connectionCount;
+        stats.packetLossRate /= connectionCount;
+        stats.jitter /= connectionCount;
+      } else {
+        // Fallback when no peer connections are available
+        stats.availableBandwidth = 1000000; // 1 Mbps
+        stats.roundTripTime = 100;
+        stats.packetLossRate = 0.01;
+        stats.jitter = 0.02;
+      }
+
+      return stats;
+    } catch (error) {
+      console.error('Failed to get real WebRTC stats:', error);
+      // Fallback to basic estimation
+      return {
+        availableBandwidth: 1000000,
+        roundTripTime: 100,
+        packetLossRate: 0.01,
+        jitter: 0.02
+      };
+    }
   }
 
   /**

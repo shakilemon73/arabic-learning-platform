@@ -89,7 +89,11 @@ export default function EnterpriseMeetPage() {
   // Core Platform State
   const [isConnected, setIsConnected] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [roomId, setRoomId] = useState<string>('enterprise-demo-room');
+  const [roomId, setRoomId] = useState<string>(() => {
+    // Get room ID from URL parameters or generate one
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('room') || `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  });
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -247,12 +251,28 @@ export default function EnterpriseMeetPage() {
     try {
       console.log('🎯 Joining Enterprise Meeting with Full Feature Set...');
 
-      // Join main video room
+      // Join main video room with real participant tracking
       await videoSDK.joinRoom({
         roomId,
         userId: user.id,
-        userRole: 'host', // Demo as host to show all features
-        displayName: (profile as any)?.display_name || user.email?.split('@')[0] || 'Enterprise User'
+        displayName: (profile as any)?.display_name || user.email?.split('@')[0] || 'Enterprise User',
+        role: 'participant' // Let the system determine role based on room ownership
+      });
+
+      // Add participant to Supabase database
+      const supabase = createClient(ENTERPRISE_CONFIG.supabaseUrl, ENTERPRISE_CONFIG.supabaseKey);
+      await supabase.from('video_conference_participants').insert({
+        room_id: roomId,
+        user_id: user.id,
+        display_name: (profile as any)?.display_name || user.email?.split('@')[0] || 'Enterprise User',
+        role: 'participant',
+        is_video_enabled: true,
+        is_audio_enabled: true,
+        is_hand_raised: false,
+        connection_quality: 'excellent',
+        is_screen_sharing: false,
+        is_active: true,
+        joined_at: new Date().toISOString()
       });
 
       // Get local media stream
@@ -292,10 +312,20 @@ export default function EnterpriseMeetPage() {
     }
   }, [user, videoSDK, audioManager, virtualBgManager, profile, roomId, audioEnhancement, virtualBackground]);
 
-  // Leave Meeting
+  // Leave Meeting with real cleanup
   const leaveMeeting = useCallback(async () => {
     try {
       console.log('👋 Leaving Enterprise Meeting...');
+
+      // Remove participant from Supabase database
+      if (user) {
+        const supabase = createClient(ENTERPRISE_CONFIG.supabaseUrl, ENTERPRISE_CONFIG.supabaseKey);
+        await supabase
+          .from('video_conference_participants')
+          .update({ is_active: false, left_at: new Date().toISOString() })
+          .eq('room_id', roomId)
+          .eq('user_id', user.id);
+      }
 
       // Stop all processing
       if (audioManager) audioManager.cleanup();
@@ -316,12 +346,13 @@ export default function EnterpriseMeetPage() {
       }
 
       setIsConnected(false);
+      setParticipants([]);
       console.log('✅ Left Enterprise Meeting Successfully');
 
     } catch (error) {
       console.error('❌ Error leaving meeting:', error);
     }
-  }, [audioManager, virtualBgManager, bitrateManager, recordingManager, screenManager, localStream, videoSDK, isRecording]);
+  }, [user, roomId, audioManager, virtualBgManager, bitrateManager, recordingManager, screenManager, localStream, videoSDK, isRecording]);
 
   // Initialize platform on component mount
   useEffect(() => {
@@ -447,53 +478,75 @@ export default function EnterpriseMeetPage() {
     setViewMode(mode);
   }, []);
 
-  // Mock participants for demo
+  // Real-time participants from Supabase
   useEffect(() => {
-    if (isConnected) {
-      setParticipants([
-        {
-          id: user?.id || '1',
-          name: (profile as any)?.display_name || 'You',
-          role: 'host',
-          videoEnabled: true,
-          audioEnabled: true,
-          screenSharing: false,
-          handRaised: false,
-          connectionQuality: 'excellent'
-        },
-        {
-          id: '2',
-          name: 'Dr. Ahmed Hassan',
-          role: 'moderator',
-          videoEnabled: true,
-          audioEnabled: true,
-          screenSharing: false,
-          handRaised: false,
-          connectionQuality: 'excellent'
-        },
-        {
-          id: '3',
-          name: 'Sarah Johnson',
-          role: 'participant',
-          videoEnabled: true,
-          audioEnabled: false,
-          screenSharing: false,
-          handRaised: true,
-          connectionQuality: 'good'
-        },
-        {
-          id: '4',
-          name: 'Mohammed Ali',
-          role: 'participant',
-          videoEnabled: false,
-          audioEnabled: true,
-          screenSharing: false,
-          handRaised: false,
-          connectionQuality: 'excellent'
+    if (!isConnected || !videoSDK) return;
+
+    const loadRealParticipants = async () => {
+      try {
+        // Get current participants from Supabase database
+        const supabase = createClient(ENTERPRISE_CONFIG.supabaseUrl, ENTERPRISE_CONFIG.supabaseKey);
+        
+        const { data: participantsData, error } = await supabase
+          .from('video_conference_participants')
+          .select(`
+            id,
+            user_id,
+            display_name,
+            role,
+            is_video_enabled,
+            is_audio_enabled,
+            is_hand_raised,
+            connection_quality,
+            is_screen_sharing,
+            joined_at
+          `)
+          .eq('room_id', roomId)
+          .eq('is_active', true);
+
+        if (error) {
+          console.error('Failed to load participants:', error);
+          return;
         }
-      ]);
-    }
-  }, [isConnected, user, profile]);
+
+        // Convert to participant format
+        const realParticipants: Participant[] = participantsData?.map(p => ({
+          id: p.user_id,
+          name: p.display_name,
+          role: p.role as 'host' | 'moderator' | 'participant' | 'viewer',
+          videoEnabled: p.is_video_enabled,
+          audioEnabled: p.is_audio_enabled,
+          screenSharing: p.is_screen_sharing,
+          handRaised: p.is_hand_raised,
+          connectionQuality: p.connection_quality as 'excellent' | 'good' | 'poor' | 'disconnected'
+        })) || [];
+
+        setParticipants(realParticipants);
+
+        // Set up real-time subscription for participant changes
+        const subscription = supabase
+          .channel(`room-${roomId}-participants`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'video_conference_participants',
+            filter: `room_id=eq.${roomId}`
+          }, (payload) => {
+            console.log('Participant update:', payload);
+            loadRealParticipants(); // Reload participants on any change
+          })
+          .subscribe();
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error loading real participants:', error);
+      }
+    };
+
+    loadRealParticipants();
+  }, [isConnected, videoSDK, roomId]);
 
   // Don't render if not authenticated
   if (!user) {
