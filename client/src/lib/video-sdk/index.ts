@@ -48,8 +48,8 @@ export { ScreenShareManager } from './core/ScreenShareManager';
 // Interactive Whiteboard
 export { WhiteboardManager } from './core/WhiteboardManager';
 
-// Recording
-export { RecordingManager } from './core/RecordingManager';
+// Recording (Legacy)
+export { RecordingManager as LegacyRecordingManager } from './core/RecordingManager';
 
 // Moderation
 export { ModeratorManager } from './core/ModeratorManager';
@@ -57,30 +57,57 @@ export { ModeratorManager } from './core/ModeratorManager';
 // Stream Quality
 export { StreamQualityManager } from './core/StreamQualityManager';
 
+// Enterprise Features
+export { EnterpriseVideoSDK, createEnterpriseVideoSDK } from './enterprise/EnterpriseVideoSDK';
+export type { EnterpriseVideoSDKConfig, ParticipantStream, RoomSession } from './enterprise/EnterpriseVideoSDK';
+
+export { SFUManager } from './enterprise/SFUManager';
+export type { SFUConfig, MediaStream as SFUMediaStream, SFUStats } from './enterprise/SFUManager';
+
+export { AdaptiveBitrateManager } from './enterprise/AdaptiveBitrateManager';
+export type { NetworkConditions, QualitySettings, AdaptationRules } from './enterprise/AdaptiveBitrateManager';
+
+export { AudioProcessingManager } from './enterprise/AudioProcessingManager';
+export type { AudioProcessingConfig, AudioMetrics, VoiceActivityEvent } from './enterprise/AudioProcessingManager';
+
+export { NetworkResilienceManager } from './enterprise/NetworkResilienceManager';
+export type { TURNServerConfig, NetworkPath, NetworkStats } from './enterprise/NetworkResilienceManager';
+
+export { RecordingManager as EnterpriseRecordingManager } from './enterprise/RecordingManager';
+export type { RecordingConfig, RecordingSession, RecordingMetrics } from './enterprise/RecordingManager';
+
 // SDK Version
-export const SDK_VERSION = '1.0.0';
+export const SDK_VERSION = '2.0.0';
 
 // SDK Info
 export const SDK_INFO = {
-  name: 'WorldClass Video SDK',
+  name: 'Enterprise Video SDK',
   version: SDK_VERSION,
-  description: 'Enterprise-grade video streaming, audio, live chat, and collaboration SDK',
+  description: 'Production-grade video conferencing platform comparable to Zoom, Teams, Google Meet',
   features: [
-    'Multi-participant video conferencing (1000+ users)',
-    'Live streaming to unlimited audiences',
-    'Real-time chat with moderation',
-    'Interactive whiteboard collaboration',
-    'Screen sharing and recording',
-    'Advanced moderator controls',
-    'Adaptive streaming quality',
-    'WebRTC SFU architecture',
-    'Supabase real-time backend',
-    'AI-powered features'
+    'SFU Architecture - Scalable media distribution for 1000+ participants',
+    'Adaptive Bitrate Streaming - Real-time quality optimization',
+    'Advanced Audio Processing - AI-powered noise suppression & echo cancellation', 
+    'Network Resilience - TURN servers, packet loss recovery, path optimization',
+    'Professional Recording - Multi-stream composition with cloud storage',
+    'Geographic Distribution - Global edge servers for low latency',
+    'Load Balancing - Automatic participant distribution across SFU instances',
+    'Real-time Analytics - Performance monitoring and optimization',
+    'WebRTC Security - End-to-end encryption and secure connections',
+    'Enterprise Integration - Supabase backend with PostgreSQL storage'
   ],
   compatibility: {
     browsers: ['Chrome 80+', 'Firefox 75+', 'Safari 13+', 'Edge 80+'],
-    platforms: ['Web', 'Mobile Web', 'Electron', 'React Native (planned)'],
-    backends: ['Supabase', 'PostgreSQL', 'WebRTC']
+    platforms: ['Web', 'Mobile Web', 'Electron', 'React Native'],
+    backends: ['Supabase', 'PostgreSQL', 'WebRTC', 'TURN Servers']
+  },
+  enterpriseFeatures: {
+    sfu: 'Selective Forwarding Unit for scalable media distribution',
+    adaptiveBitrate: 'AI-driven quality adaptation based on network conditions',
+    audioProcessing: 'Professional audio pipeline with ML-based enhancement',
+    networkResilience: 'Multi-path networking with automatic failover',
+    recording: 'Server-side recording with multi-stream composition',
+    loadBalancing: 'Geographic distribution and automatic scaling'
   }
 };
 
