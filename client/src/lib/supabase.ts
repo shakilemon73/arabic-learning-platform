@@ -1,15 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://sgyanvjlwlrzcrpjwlsd.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNneWFudmpsd2xyemNycGp3bHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NTg1MjAsImV4cCI6MjA3MDEzNDUyMH0.5xjMdSUdeHGln68tfuw626q4xDZkuR8Xg_e_w6g9iJk';
+// Security: Validate environment variables without exposing fallbacks
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-
-
+// Security: Strict environment validation
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
+  console.error('🚨 CRITICAL: Missing Supabase environment variables');
+  throw new Error('Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be configured');
 }
 
+// Security: Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch {
+  throw new Error('Invalid VITE_SUPABASE_URL format. Must be a valid URL.');
+}
+
+// Security: Validate anon key format (JWT should have 3 parts)
+if (!supabaseAnonKey.includes('.') || supabaseAnonKey.split('.').length !== 3) {
+  throw new Error('Invalid VITE_SUPABASE_ANON_KEY format. Must be a valid JWT token.');
+}
+
+// Security: Enhanced Supabase client configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -22,36 +35,44 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         try {
           return window.localStorage.getItem(key);
         } catch (error) {
-          console.warn('Error accessing localStorage:', error);
+          console.warn('🔒 Secure storage access error:', error);
           return null;
         }
       },
       setItem: (key: string, value: string) => {
         try {
+          // Security: Validate value before storing
+          if (value && value.length > 50000) { // Reasonable limit
+            console.warn('🔒 Storage value too large, rejecting');
+            return;
+          }
           window.localStorage.setItem(key, value);
         } catch (error) {
-          console.warn('Error setting localStorage:', error);
+          console.warn('🔒 Secure storage write error:', error);
         }
       },
       removeItem: (key: string) => {
         try {
           window.localStorage.removeItem(key);
         } catch (error) {
-          console.warn('Error removing from localStorage:', error);
+          console.warn('🔒 Secure storage removal error:', error);
         }
       }
     } : undefined,
-    debug: import.meta.env.DEV
+    debug: import.meta.env.DEV && false // Disable debug in production for security
   },
   global: {
     headers: {
-      'X-Client-Info': 'supabase-js-web',
+      'X-Client-Info': 'arabic-learning-platform',
+      'X-App-Version': '1.0.0',
     },
   },
   realtime: {
     params: {
       eventsPerSecond: 10,
     },
+    timeout: 30000, // 30 second timeout
+    heartbeatIntervalMs: 30000, // Heartbeat every 30 seconds
   },
 });
 

@@ -1,5 +1,6 @@
-// Real API functions using Supabase
+// Real API functions using Supabase with security enhancements
 import { supabase } from './supabase';
+import { securityManager } from './security';
 import type { 
   User, 
   CourseModule, 
@@ -61,31 +62,47 @@ export const getCourseModules = async (): Promise<CourseModule[]> => {
   return data || [];
 };
 
-// Live class functions
+// Live class functions with security enhancements
 export const getLiveClasses = async (): Promise<LiveClassWithDetails[]> => {
-  const { data, error } = await supabase
-    .from('live_classes')
-    .select(`
-      *,
-      course_modules (
-        title,
-        title_bn,
-        level
-      ),
-      instructors (
-        name,
-        name_bn,
-        email
-      )
-    `)
-    .eq('is_active', true)
-    .order('scheduled_at');
+  try {
+    // Security: Validate session before making API calls
+    const { valid } = await securityManager.validateSession();
+    if (!valid) {
+      throw new Error('Invalid session. Please login again.');
+    }
+
+    const { data, error } = await supabase
+      .from('live_classes')
+      .select(`
+        *,
+        course_modules (
+          title,
+          title_bn,
+          level
+        ),
+        instructors (
+          name,
+          name_bn,
+          email
+        )
+      `)
+      .eq('is_active', true)
+      .order('scheduled_at')
+      .limit(50); // Security: Limit query results
+      
+    if (error) {
+      securityManager.logSecurityEvent('api_error', {
+        function: 'getLiveClasses',
+        error: error.message
+      });
+      throw error;
+    }
     
-  if (error) {
-    console.error('Error fetching live classes:', error);
+    return data || [];
+  } catch (error) {
+    console.error('🔒 Secure API Error - getLiveClasses:', error);
     throw error;
   }
-  return data || [];
 };
 
 export const getLiveClassById = async (classId: string): Promise<LiveClassWithDetails | null> => {

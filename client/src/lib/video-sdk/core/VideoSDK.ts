@@ -81,6 +81,18 @@ export class VideoSDK extends EventEmitter {
   constructor(config: VideoSDKConfig) {
     super();
     
+    // Security: Validate configuration
+    if (!config.supabaseUrl || !config.supabaseKey) {
+      throw new Error('VideoSDK requires valid Supabase credentials');
+    }
+
+    // Security: Validate URL format
+    try {
+      new URL(config.supabaseUrl);
+    } catch {
+      throw new Error('Invalid Supabase URL format');
+    }
+    
     this.config = {
       stunServers: [
         'stun:stun.l.google.com:19302',
@@ -88,17 +100,45 @@ export class VideoSDK extends EventEmitter {
         'stun:stun2.l.google.com:19302'
       ],
       turnServers: [],
-      maxParticipants: 100,
+      maxParticipants: Math.min(config.maxParticipants || 100, 1000), // Security: Limit max participants
       ...config
     };
 
-    this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
-    this.isInitialized = true;
+    try {
+      this.supabase = createClient(config.supabaseUrl, config.supabaseKey, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: false, // Security: Don't persist sessions in VideoSDK
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 20, // Higher for video conferencing
+          },
+        },
+      });
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('🔒 VideoSDK initialization failed:', error);
+      throw new Error('Failed to initialize VideoSDK with provided configuration');
+    }
   }
 
-  // Initialize media and join room
+  // Initialize media and join room with security validation
   async joinRoom(sessionConfig: SessionConfig): Promise<void> {
     try {
+      // Security: Import and validate connection attempt
+      const { videoSecurityManager } = await import('../../videoSecurity');
+      const validation = videoSecurityManager.validateConnectionAttempt(
+        sessionConfig.userId, 
+        sessionConfig.roomId
+      );
+      
+      if (!validation.allowed) {
+        throw new Error(validation.reason || 'Connection not allowed');
+      }
+
+      // Security: Sanitize display name
+      sessionConfig.displayName = videoSecurityManager.sanitizeDisplayName(sessionConfig.displayName);
       console.log('🔄 Joining room:', sessionConfig.roomId);
       console.log('📋 Session config:', sessionConfig);
       this.session = sessionConfig;

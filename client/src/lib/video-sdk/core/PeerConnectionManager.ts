@@ -364,7 +364,25 @@ export class PeerConnectionManager extends EventEmitter {
    */
   private handleConnectionFailure(participantId: string): void {
     console.warn(`⚠️ Peer connection failed for participant ${participantId}`);
-    this.emit('connection-failed', { participantId });
+    
+    // Security: Clean up failed connection resources
+    const peerConnection = this.peerConnections.get(participantId);
+    if (peerConnection) {
+      peerConnection.close();
+      this.peerConnections.delete(participantId);
+    }
+    
+    // Clean up data channel
+    const dataChannel = this.dataChannels.get(participantId);
+    if (dataChannel) {
+      dataChannel.close();
+      this.dataChannels.delete(participantId);
+    }
+    
+    // Clear pending candidates
+    this.pendingCandidates.delete(participantId);
+    
+    this.emit('connection-failed', { participantId, timestamp: Date.now() });
   }
 
   /**
@@ -378,7 +396,9 @@ export class PeerConnectionManager extends EventEmitter {
           const connectionStats = this.parseConnectionStats(participantId, stats);
           this.emit('connection-stats', connectionStats);
         } catch (error) {
-          // Stats gathering failed, connection might be closed
+          // Security: Log stats gathering failures for monitoring
+          console.warn(`⚠️ Connection stats failed for ${participantId}:`, error);
+          this.emit('stats-error', { participantId, error: error instanceof Error ? error.message : 'Unknown error' });
         }
       }
     }, 5000);

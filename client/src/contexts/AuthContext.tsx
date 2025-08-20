@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { securityManager } from '@/lib/security';
 
 // Enhanced user profile interface
 interface UserProfile {
@@ -246,17 +247,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Sign in function
+  // Sign in function with security enhancements
   const signIn = async (email: string, password: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
+      // Security: Input validation and sanitization
+      const sanitizedEmail = securityManager.sanitizeInput(email.trim().toLowerCase());
+      
+      // Security: Rate limiting check
+      const clientId = navigator.userAgent + window.location.hostname;
+      if (!securityManager.checkRateLimit(`login:${clientId}`, 5, 300000)) { // 5 attempts per 5 minutes
+        const error = new Error('Too many login attempts. Please try again later.') as AuthError;
+        securityManager.logSecurityEvent('rate_limit_exceeded', { email: sanitizedEmail, clientId });
+        setState(prev => ({ ...prev, loading: false, error }));
+        toast({
+          title: "অতিরিক্ত প্রচেষ্টা",
+          description: "অনেকবার চেষ্টা করেছেন। ৫ মিনিট পর চেষ্টা করুন।",
+          variant: "destructive",
+        });
+        return { error };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: sanitizedEmail,
         password,
       });
 
       if (error) {
+        securityManager.logSecurityEvent('login_failed', { 
+          email: sanitizedEmail, 
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        
         setState(prev => ({ ...prev, loading: false, error }));
         toast({
           title: "সাইন ইন ত্রুটি",
@@ -268,6 +292,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { error };
       }
 
+      // Security: Log successful login
+      securityManager.logSecurityEvent('login_success', { 
+        email: sanitizedEmail,
+        userId: data.user?.id 
+      });
+
       // Auth state will be updated by the listener
       toast({
         title: "সফলভাবে লগইন হয়েছে",
@@ -277,6 +307,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return { error: null };
     } catch (err) {
       const authError = err as AuthError;
+      securityManager.logSecurityEvent('login_exception', { 
+        error: authError.message,
+        stack: authError.stack 
+      });
       setState(prev => ({ ...prev, loading: false, error: authError }));
       return { error: authError };
     }

@@ -9,10 +9,11 @@ import { ArrowLeft, Calendar, Clock, Users, Play, Pause, MessageSquare, Video } 
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
-import { VideoSDKProvider, useVideoSDK } from '@/components/video-sdk/VideoSDKProvider';
+import { VideoSDKProvider } from '@/components/video-sdk/VideoSDKProvider';
 import { VideoConference } from '@/components/video-sdk/VideoConference';
+import { useSecureVideoSDK } from '@/hooks/useSecureVideoSDK';
+import { performanceMonitor } from '@/lib/performanceMonitor';
 // import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
 
 
@@ -54,8 +55,9 @@ function LiveClassContent() {
     initializeSDK,
     joinRoom,
     leaveRoom,
-    error
-  } = useVideoSDK();
+    error,
+    connectionStats
+  } = useSecureVideoSDK();
 
   // Get class ID from URL params
   const classId = new URLSearchParams(window.location.search).get('id');
@@ -178,6 +180,20 @@ function LiveClassContent() {
     if (!user) {
       console.error('User authentication required - please login first');
       alert('অনুগ্রহ করে প্রথমে লগইন করুন / Please login first');
+      navigate('/login');
+      return;
+    }
+
+    // Security: Validate session before allowing class join
+    try {
+      const { valid } = await import('@/lib/security').then(m => m.securityManager.validateSession());
+      if (!valid) {
+        alert('আপনার সেশন শেষ হয়ে গেছে। দয়া করে আবার লগইন করুন / Session expired. Please login again.');
+        navigate('/login');
+        return;
+      }
+    } catch (error) {
+      console.error('Session validation failed:', error);
       navigate('/login');
       return;
     }

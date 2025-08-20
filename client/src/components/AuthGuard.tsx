@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Shield, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
+import { securityManager } from '@/lib/security';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -130,15 +132,29 @@ export default function AuthGuard({
     }
   }, [loading, requireAuth, user, redirectTo, setLocation]);
 
-  // Force stop loading after timeout to prevent infinite loading loops
+  // Security: Enhanced timeout with proper validation
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     if (loading) {
-      timeoutId = setTimeout(() => {
-        console.log('⏰ AuthGuard: Loading timeout reached, forcing resolution');
-        setForceNoLoading(true);
-      }, 5000); // 5 second timeout
+      timeoutId = setTimeout(async () => {
+        console.log('⏰ AuthGuard: Loading timeout reached, validating session...');
+        
+        // Security: Validate session before forcing resolution
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            console.log('✅ Valid session found during timeout, allowing access');
+            setForceNoLoading(true);
+          } else {
+            console.log('❌ No valid session during timeout, maintaining auth requirement');
+            setForceNoLoading(false);
+          }
+        } catch (error) {
+          console.error('🔒 Session validation error during timeout:', error);
+          setForceNoLoading(false);
+        }
+      }, 8000); // Increased to 8 seconds for better reliability
     } else {
       setForceNoLoading(false);
     }
