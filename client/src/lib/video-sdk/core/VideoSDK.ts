@@ -99,15 +99,19 @@ export class VideoSDK extends EventEmitter {
   async joinRoom(sessionConfig: SessionConfig): Promise<void> {
     try {
       console.log('🔄 Joining room:', sessionConfig.roomId);
+      console.log('📋 Session config:', sessionConfig);
       this.session = sessionConfig;
 
       // Get user media first
+      console.log('🎯 Step 1: Initializing media...');
       await this.initializeMedia();
 
       // Setup signaling
+      console.log('🎯 Step 2: Setting up signaling...');
       await this.setupSignaling();
 
-      // Join room in database
+      // Join room in database (optional)
+      console.log('🎯 Step 3: Recording participation...');
       await this.joinRoomInDatabase();
 
       this.isConnected = true;
@@ -116,6 +120,11 @@ export class VideoSDK extends EventEmitter {
       
     } catch (error) {
       console.error('❌ Failed to join room:', error);
+      console.error('🔍 Error details:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
       this.emit('error', { message: 'Failed to join room: ' + (error as Error).message });
       throw error;
     }
@@ -125,6 +134,11 @@ export class VideoSDK extends EventEmitter {
   private async initializeMedia(): Promise<void> {
     try {
       console.log('🎥 Initializing camera and microphone...');
+      
+      // Check if media devices are available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not supported by this browser');
+      }
       
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -145,7 +159,16 @@ export class VideoSDK extends EventEmitter {
       
     } catch (error) {
       console.error('❌ Failed to get user media:', error);
-      throw new Error('Camera/microphone access denied. Please allow permissions.');
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          throw new Error('Camera/microphone access denied. Please allow permissions and refresh the page.');
+        } else if (error.name === 'NotFoundError') {
+          throw new Error('No camera or microphone found. Please connect a camera and microphone.');
+        } else if (error.name === 'NotReadableError') {
+          throw new Error('Camera or microphone is already in use by another application.');
+        }
+      }
+      throw new Error('Failed to access camera/microphone: ' + (error as Error).message);
     }
   }
 
@@ -153,36 +176,48 @@ export class VideoSDK extends EventEmitter {
   private async setupSignaling(): Promise<void> {
     if (!this.session) return;
 
-    // Listen for new participants
-    const channel = this.supabase
-      .channel(`room:${this.session.roomId}`)
-      .on('presence', { event: 'join' }, (payload) => {
-        console.log('👤 New participant joined:', payload);
-        this.handleParticipantJoined(payload.data);
-      })
-      .on('presence', { event: 'leave' }, (payload) => {
-        console.log('👋 Participant left:', payload);
-        this.handleParticipantLeft(payload.data.userId);
-      })
-      .on('broadcast', { event: 'offer' }, (payload) => {
-        this.handleOffer(payload.payload);
-      })
-      .on('broadcast', { event: 'answer' }, (payload) => {
-        this.handleAnswer(payload.payload);
-      })
-      .on('broadcast', { event: 'ice-candidate' }, (payload) => {
-        this.handleIceCandidate(payload.payload);
-      })
-      .subscribe();
+    try {
+      console.log('📡 Setting up Supabase real-time signaling...');
+      
+      // Listen for new participants
+      const channel = this.supabase
+        .channel(`room:${this.session.roomId}`)
+        .on('presence', { event: 'join' }, (payload) => {
+          console.log('👤 New participant joined:', payload);
+          this.handleParticipantJoined(payload.data);
+        })
+        .on('presence', { event: 'leave' }, (payload) => {
+          console.log('👋 Participant left:', payload);
+          this.handleParticipantLeft(payload.data.userId);
+        })
+        .on('broadcast', { event: 'offer' }, (payload) => {
+          this.handleOffer(payload.payload);
+        })
+        .on('broadcast', { event: 'answer' }, (payload) => {
+          this.handleAnswer(payload.payload);
+        })
+        .on('broadcast', { event: 'ice-candidate' }, (payload) => {
+          this.handleIceCandidate(payload.payload);
+        })
+        .subscribe((status) => {
+          console.log('📡 Supabase channel subscription status:', status);
+        });
 
-    // Join presence
-    await channel.track({
-      userId: this.session.userId,
-      displayName: this.session.displayName,
-      role: this.session.userRole,
-      videoEnabled: this.isVideoEnabled,
-      audioEnabled: this.isAudioEnabled
-    });
+      // Join presence
+      console.log('👋 Joining presence with user data...');
+      await channel.track({
+        userId: this.session.userId,
+        displayName: this.session.displayName,
+        role: this.session.userRole,
+        videoEnabled: this.isVideoEnabled,
+        audioEnabled: this.isAudioEnabled
+      });
+      
+      console.log('✅ Signaling setup completed');
+    } catch (error) {
+      console.error('❌ Failed to setup signaling:', error);
+      throw error;
+    }
   }
 
   // Handle new participant joining
@@ -356,18 +391,28 @@ export class VideoSDK extends EventEmitter {
   private async joinRoomInDatabase(): Promise<void> {
     if (!this.session) return;
 
-    const { error } = await this.supabase
-      .from('video_room_participants')
-      .insert({
-        room_id: this.session.roomId,
-        user_id: this.session.userId,
-        display_name: this.session.displayName,
-        role: this.session.userRole,
-        joined_at: new Date().toISOString()
-      });
+    try {
+      console.log('💾 Attempting to record participation in database...');
+      
+      const { error } = await this.supabase
+        .from('video_room_participants')
+        .insert({
+          room_id: this.session.roomId,
+          user_id: this.session.userId,
+          display_name: this.session.displayName,
+          role: this.session.userRole,
+          joined_at: new Date().toISOString()
+        });
 
-    if (error) {
-      console.error('❌ Failed to join room in database:', error);
+      if (error) {
+        console.log('⚠️ Database participation recording failed (this is optional):', error.message);
+        // Don't throw error - this is optional functionality
+      } else {
+        console.log('✅ Participation recorded in database');
+      }
+    } catch (error) {
+      console.log('⚠️ Database operation failed (continuing anyway):', error);
+      // Don't throw error - database recording is optional
     }
   }
 
