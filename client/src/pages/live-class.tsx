@@ -14,6 +14,8 @@ import { VideoSDKProvider } from '@/components/video-sdk/VideoSDKProvider';
 import { VideoConference } from '@/components/video-sdk/VideoConference';
 import { useSecureVideoSDK } from '@/hooks/useSecureVideoSDK';
 import { performanceMonitor } from '@/lib/performanceMonitor';
+import SupabaseLiveChat from '@/components/SupabaseLiveChat';
+import HomeworkSubmissions from '@/components/HomeworkSubmissions';
 // import { createVideoRoom, joinVideoRoom } from '@/lib/video-sdk/database/videoSDKDatabase';
 
 
@@ -605,21 +607,19 @@ function LiveClassWithTabs({
         </TabsContent>
 
         <TabsContent value="chat" className="flex-1 m-0 p-4 bg-gray-800">
-          <div className="h-full bg-gray-900 rounded-lg p-4">
-            <h3 className="font-bengali text-white text-lg mb-4">লাইভ চ্যাট</h3>
-            <div className="flex-1 bg-gray-800 rounded-lg p-4 mb-4 min-h-96 overflow-y-auto">
-              <p className="text-gray-400 font-bengali text-center">চ্যাট বার্তা এখানে দেখা যাবে...</p>
-            </div>
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                placeholder="আপনার বার্তা লিখুন..."
-                className="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 font-bengali"
+          <div className="h-full">
+            {classId ? (
+              <SupabaseLiveChat 
+                classId={classId} 
+                isActive={activeTab === 'chat' && isClassActive}
               />
-              <Button className="bg-islamic-green hover:bg-islamic-green/80 text-white px-6">
-                পাঠান
-              </Button>
-            </div>
+            ) : (
+              <div className="h-full bg-gray-900 rounded-lg p-4 flex items-center justify-center">
+                <p className="text-gray-400 font-bengali text-center">
+                  চ্যাট ব্যবহার করতে একটি নির্দিষ্ট ক্লাস নির্বাচন করুন
+                </p>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -634,7 +634,17 @@ function LiveClassWithTabs({
 
         <TabsContent value="resources" className="flex-1 m-0 p-4 bg-gray-800">
           <div className="h-full bg-gray-900 rounded-lg p-4">
-            <h3 className="font-bengali text-white text-lg mb-4">ক্লাসের রিসোর্স</h3>
+            <h3 className="font-bengali text-white text-lg mb-4">ক্লাসের রিসোর্স ও হোমওয়ার্ক</h3>
+            
+            {/* Homework Submissions Section */}
+            <div className="mb-6">
+              <HomeworkSubmissions 
+                classId={classId} 
+                showSubmitForm={isClassActive}
+              />
+            </div>
+            
+            {/* Class Resources Section */}
             <div className="space-y-4">
               <div className="bg-gray-800 rounded-lg p-4">
                 <h4 className="font-bengali text-white font-medium mb-2">আজকের পাঠ্য</h4>

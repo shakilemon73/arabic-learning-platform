@@ -269,3 +269,86 @@ export const createHomeworkSubmission = async (submissionData: {
     .single();
   return { data, error };
 };
+
+// Chat messages functions
+export const getChatMessages = async (classId: string) => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('class_id', classId)
+    .order('sent_at', { ascending: true });
+  return { data, error };
+};
+
+export const sendChatMessage = async (messageData: {
+  class_id: string;
+  user_id: string;
+  message: string;
+  message_type?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      ...messageData,
+      message_type: messageData.message_type || 'text',
+      sent_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+  return { data, error };
+};
+
+// Chat reactions functions
+export const addChatReaction = async (messageId: string, userId: string, emoji: string, displayName: string) => {
+  const { data, error } = await supabase
+    .from('chat_reactions')
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      display_name: displayName,
+      emoji
+    })
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const getChatReactions = async (messageId: string) => {
+  const { data, error } = await supabase
+    .from('chat_reactions')
+    .select('*')
+    .eq('message_id', messageId);
+  return { data, error };
+};
+
+// Homework submissions functions  
+export const getUserHomework = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('homework_submissions')
+    .select(`
+      *,
+      live_classes (
+        title,
+        title_bn,
+        scheduled_at
+      )
+    `)
+    .eq('user_id', userId)
+    .order('submitted_at', { ascending: false });
+  return { data, error };
+};
+
+export const updateHomeworkStatus = async (submissionId: string, status: string, grade?: number, feedback?: string) => {
+  const updateData: any = { status };
+  if (grade !== undefined) updateData.grade = grade;
+  if (feedback) updateData.feedback = feedback;
+  if (status === 'graded') updateData.graded_at = new Date().toISOString();
+  
+  const { data, error } = await supabase
+    .from('homework_submissions')
+    .update(updateData)
+    .eq('id', submissionId)
+    .select()
+    .single();
+  return { data, error };
+};
