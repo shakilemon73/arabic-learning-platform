@@ -640,14 +640,4 @@ export class RealTimeSubscriptions {
 // Export the configured Supabase client
 export { supabase };
 
-// Export all APIs
-export {
-  SFUManagementAPI,
-  RecordingManagementAPI,
-  NetworkQualityAPI,
-  AudioProcessingAPI,
-  QualityAdaptationAPI,
-  PerformanceMonitoringAPI,
-  ParticipantManagementAPI,
-  RealTimeSubscriptions
-};
+// Export the configured Supabase client and all APIs

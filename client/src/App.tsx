@@ -16,6 +16,7 @@ import LiveClass from "@/pages/live-class";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
+
 import { useEffect } from "react";
 
 function Router() {
