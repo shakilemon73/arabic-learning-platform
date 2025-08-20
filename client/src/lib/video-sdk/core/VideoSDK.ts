@@ -437,9 +437,15 @@ export class VideoSDK extends EventEmitter {
     // Create peer connection for this participant
     await this.createPeerConnection(participantData.userId);
     
-    // CRITICAL: ALL participants initiate connections (not just host)
-    // This creates the full mesh network like Zoom
-    await this.createOffer(participantData.userId);
+    // CRITICAL FIX: Use proper connection initiation logic
+    // Only initiate offer if we're the "higher" user (prevents duplicate offers)
+    const shouldInitiate = this.session.userId > participantData.userId;
+    if (shouldInitiate) {
+      console.log('🎯 INITIATING WebRTC offer to:', participantData.userId);
+      await this.createOffer(participantData.userId);
+    } else {
+      console.log('⏳ WAITING for WebRTC offer from:', participantData.userId);
+    }
     
     console.log('✅ Bidirectional connection setup initiated with:', participantData.userId);
   }
@@ -460,12 +466,25 @@ export class VideoSDK extends EventEmitter {
       });
     }
 
-    // Handle remote stream
+    // Handle remote stream - CRITICAL FIX for Zoom-like functionality
     pc.ontrack = (event) => {
-      console.log('🎬 Received remote stream from:', participantId);
+      console.log('🎬 RECEIVED REMOTE STREAM from:', participantId, 'tracks:', event.streams[0].getTracks().length);
       const [remoteStream] = event.streams;
+      
+      // Store the stream
       this.remoteStreams.set(participantId, remoteStream);
+      
+      // Emit to UI components for display - THIS IS THE KEY FIX
+      console.log('📡 EMITTING remote-stream event for UI to display video');
       this.emit('remote-stream', { participantId, stream: remoteStream });
+      
+      // Log stream details for debugging
+      console.log('🎥 Stream details:', {
+        participantId,
+        videoTracks: remoteStream.getVideoTracks().length,
+        audioTracks: remoteStream.getAudioTracks().length,
+        streamId: remoteStream.id
+      });
     };
 
     // Handle ICE candidates
@@ -494,26 +513,39 @@ export class VideoSDK extends EventEmitter {
     return pc;
   }
 
-  // Create and send offer
+  // Create and send offer - ENHANCED FOR ZOOM-LIKE RELIABILITY
   private async createOffer(participantId: string): Promise<void> {
     const pc = this.peerConnections.get(participantId);
-    if (!pc) return;
+    if (!pc) {
+      console.error('⚠️ No peer connection found for offer to:', participantId);
+      return;
+    }
 
     try {
+      console.log('📞 CREATING WebRTC OFFER for:', participantId);
+      
+      // Ensure we have local stream before creating offer
+      if (!this.localStream) {
+        console.error('❌ No local stream available for offer');
+        return;
+      }
+      
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
       
       await pc.setLocalDescription(offer);
+      console.log('✅ Local description set for offer to:', participantId);
       
-      this.sendSignalingMessage('offer', {
-        offer,
-        targetId: participantId
+      await this.sendSignalingMessage('offer', {
+        targetId: participantId,
+        offer: offer
       });
       
+      console.log('📤 OFFER SENT to:', participantId, 'Offer type:', offer.type);
     } catch (error) {
-      console.error('❌ Failed to create offer:', error);
+      console.error('❌ Failed to create offer for', participantId, ':', error);
     }
   }
 

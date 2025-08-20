@@ -1,0 +1,36 @@
+Fix Video SDK Multiple Participants & Real-time Broadcasting Issues
+Context
+I'm building a video SDK similar to Zoom but facing two critical issues:
+Only showing single person instead of multiple participants on screen
+Real-time video/audio broadcast not working properly
+Current Setup
+Please provide this information when using the prompt:
+Framework/Technology: [e.g., WebRTC, Socket.io, React, vanilla JS]
+Backend: [e.g., Node.js, signaling server details]
+Current code structure: [paste relevant code snippets]
+Browser console errors: [any WebRTC or connection errors]
+Network setup: [STUN/TURN server configuration if any]
+Specific Help Needed
+1. Multiple Participants Display
+Please analyze my code and help me: - Create dynamic video containers for multiple participants - Implement proper participant management (join/leave handling) - Fix UI layout to show multiple video streams simultaneously - Ensure each participant gets unique video element ID - Handle video stream assignment correctly 
+2. Real-time Broadcasting Issues
+Please help me diagnose and fix: - WebRTC connection establishment problems - STUN/TURN server configuration for NAT traversal - Audio/video stream handling and broadcasting - Peer-to-peer connection management - Media constraints and codec compatibility - Browser permission handling 
+Code Review Request
+Please review my code for: 1. WebRTC implementation best practices 2. Signaling server logic 3. Media stream handling 4. Error handling for connection failures 5. Cross-browser compatibility issues 6. Performance optimizations for multiple streams 
+Expected Output
+Please provide:
+Root cause analysis of both issues
+Step-by-step fixes with code examples
+Complete working code snippets for: 
+Multiple participant video display
+Proper WebRTC connection handling
+Signaling logic for real-time communication
+Debugging steps to identify future issues
+Best practices for video SDK development
+Testing recommendations for different network conditions
+Additional Requirements
+Explain WebRTC connection states and how to handle them
+Provide error handling for common failure scenarios
+Include fallback mechanisms for connection issues
+Suggest monitoring/logging for production debugging
+Paste your current code below this line and describe your

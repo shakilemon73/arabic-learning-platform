@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useVideoSDK } from './VideoSDKProvider';
+import { ParticipantVideo } from './ParticipantVideo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -66,40 +67,73 @@ export function VideoConference({
     }
   }, [localStream]);
 
-  // Handle participant video streams - REAL IMPLEMENTATION
+  // Handle participant video streams - ZOOM-LIKE REAL-TIME IMPLEMENTATION
   useEffect(() => {
-    // Listen for remote stream events from the SDK
     if (!isConnected || !sdk) return;
 
-    const handleRemoteStream = (event: any) => {
-      const { participantId, stream } = event.detail || event;
+    console.log('🔄 Setting up REAL-TIME participant video stream handlers...');
+
+    const handleRemoteStream = (data: any) => {
+      console.log('🎥 RECEIVED REMOTE STREAM from participant:', data.participantId);
+      const { participantId, stream } = data;
+      
       setParticipantStreams(prev => {
         const newStreams = new Map(prev);
         newStreams.set(participantId, stream);
+        console.log('✅ Added stream for participant:', participantId, 'Total streams:', newStreams.size);
         return newStreams;
       });
     };
 
-    const handleParticipantLeft = (event: any) => {
-      const { participantId } = event.detail || event;
+    const handleParticipantJoined = (data: any) => {
+      console.log('👤 PARTICIPANT JOINED - preparing for video stream:', data.participant?.id);
+      // Participant joined, stream will come via handleRemoteStream
+    };
+
+    const handleParticipantLeft = (data: any) => {
+      console.log('👋 PARTICIPANT LEFT - removing video stream:', data.participantId);
+      const { participantId } = data;
+      
       setParticipantStreams(prev => {
         const newStreams = new Map(prev);
         newStreams.delete(participantId);
+        console.log('🗑️ Removed stream for participant:', participantId, 'Remaining streams:', newStreams.size);
         return newStreams;
       });
     };
 
-    // Add event listeners - REAL SDK EVENTS
+    // WebRTC Connection State Monitoring
+    const handleConnectionStateChange = (data: any) => {
+      console.log('🔗 WebRTC Connection state changed:', data);
+    };
+
+    // Add REAL SDK event listeners for ZOOM-like functionality
     if (sdk.on) {
       sdk.on('remote-stream', handleRemoteStream);
+      sdk.on('participant-joined', handleParticipantJoined);
       sdk.on('participant-left', handleParticipantLeft);
+      sdk.on('connection-state-changed', handleConnectionStateChange);
+
+      console.log('✅ Real-time video event handlers registered');
 
       return () => {
         sdk.off('remote-stream', handleRemoteStream);
+        sdk.off('participant-joined', handleParticipantJoined);
         sdk.off('participant-left', handleParticipantLeft);
+        sdk.off('connection-state-changed', handleConnectionStateChange);
+        console.log('🧹 Event handlers cleaned up');
       };
+    } else {
+      console.warn('⚠️ SDK event system not available - check VideoSDK implementation');
     }
   }, [isConnected, sdk]);
+
+  // Debug participant streams state
+  useEffect(() => {
+    console.log('📊 CURRENT STATE - Participants:', participants.length, 'Streams:', participantStreams.size);
+    console.log('📊 Participant IDs:', participants.map(p => p.id));
+    console.log('📊 Stream IDs:', Array.from(participantStreams.keys()));
+  }, [participants, participantStreams]);
 
   if (!isConnected) {
     return (
@@ -292,22 +326,3 @@ export function VideoConference({
   );
 }
 
-// Participant Video Component
-function ParticipantVideo({ stream, participant }: { stream: MediaStream; participant: any }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      className="w-full h-full object-cover"
-    />
-  );
-}
