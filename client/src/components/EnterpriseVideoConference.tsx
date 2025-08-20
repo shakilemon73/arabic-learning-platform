@@ -3,7 +3,7 @@ import { EnterpriseVideoSDK, createEnterpriseVideoSDK, ParticipantStream, RoomSe
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Record, Square, Users, Signal } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Square, Users, Signal } from 'lucide-react';
 
 interface EnterpriseVideoConferenceProps {
   roomId: string;
@@ -428,7 +428,7 @@ export default function EnterpriseVideoConference({
                     onClick={isRecording ? handleStopRecording : handleStartRecording}
                     data-testid="toggle-recording-button"
                   >
-                    {isRecording ? <Square className="h-4 w-4" /> : <Record className="h-4 w-4" />}
+                    {isRecording ? <Square className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full bg-red-500" />}
                   </Button>
                 )}
               </div>

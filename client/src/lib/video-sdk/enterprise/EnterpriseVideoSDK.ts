@@ -1,5 +1,5 @@
 import { EventEmitter } from '../core/EventEmitter';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { SFUManager, SFUConfig } from './SFUManager';
 import { AdaptiveBitrateManager } from './AdaptiveBitrateManager';
 import { AudioProcessingManager, AudioProcessingConfig } from './AudioProcessingManager';
@@ -93,8 +93,6 @@ export class EnterpriseVideoSDK extends EventEmitter {
    * Create optimized Supabase client for video conferencing
    */
   private createSupabaseClient(): SupabaseClient {
-    const { createClient } = require('@supabase/supabase-js');
-    
     return createClient(this.config.supabaseUrl, this.config.supabaseKey, {
       auth: {
         autoRefreshToken: true,
@@ -495,12 +493,13 @@ export class EnterpriseVideoSDK extends EventEmitter {
     }
     
     // Add participant streams
-    for (const [participantId, participantStream] of this.participantStreams) {
+    this.participantStreams.forEach((participantStream, participantId) => {
       allStreams.set(participantId, participantStream.stream);
-    }
+    });
     
     return allStreams;
   }
+
 
   /**
    * Handle various enterprise events
@@ -680,9 +679,9 @@ export class EnterpriseVideoSDK extends EventEmitter {
       }
 
       // Cleanup peer connections
-      for (const [participantId, peerConnection] of this.peerConnections) {
+      this.peerConnections.forEach((peerConnection) => {
         peerConnection.close();
-      }
+      });
       this.peerConnections.clear();
 
       // Stop enterprise managers
