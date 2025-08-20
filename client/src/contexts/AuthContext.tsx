@@ -75,29 +75,82 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Fetch user profile from database
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Fetching user profile for:', userId);
+      
+      // Try user_profiles table first
+      let { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      // If user_profiles table doesn't exist, try users table
+      if (error && error.code === '42P01') {
+        console.log('🔄 Trying users table instead...');
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        data = result.data;
+        error = result.error;
+      }
+
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('⚠️ Error fetching user profile:', error);
         // If profile doesn't exist, create a default one
         if (error.code === 'PGRST116') {
           return await createUserProfile(userId);
         }
-        return null;
+        // Return default profile to allow user to continue
+        return await createDefaultProfile(userId);
       }
 
+      console.log('✅ User profile fetched successfully');
       return data as UserProfile;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
+      console.error('❌ Error fetching user profile:', error);
+      // Return default profile to allow user to continue
+      return await createDefaultProfile(userId);
     }
   };
 
-  // Create default user profile
+  // Create default user profile in memory (fallback)
+  const createDefaultProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+      
+      if (!user) return null;
+
+      console.log('📋 Creating default profile for user to continue...');
+      
+      // Return in-memory profile that allows user to continue
+      const defaultProfile: UserProfile = {
+        id: userId,
+        email: user.email!,
+        first_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'User',
+        last_name: user.user_metadata?.last_name || '',
+        phone: user.phone || null,
+        avatar_url: user.user_metadata?.avatar_url || null,
+        enrollment_status: 'pending' as const,
+        payment_status: 'pending' as const,
+        course_progress: 0,
+        classes_attended: 0,
+        certificate_score: 0,
+        role: 'student' as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      return defaultProfile;
+    } catch (error) {
+      console.error('❌ Error creating default profile:', error);
+      return null;
+    }
+  };
+  
+  // Create user profile in database
   const createUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -120,15 +173,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         role: 'student' as const,
       };
 
-      const { data, error } = await supabase
+      // Try user_profiles table first
+      let { data, error } = await supabase
         .from('user_profiles')
         .insert([newProfile])
         .select()
         .single();
+        
+      // If table doesn't exist, try users table
+      if (error && error.code === '42P01') {
+        const result = await supabase
+          .from('users')
+          .insert([newProfile])
+          .select()
+          .single();
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
-        console.error('Error creating user profile:', error);
-        return null;
+        console.error('⚠️ Error creating user profile in database:', error);
+        // Return default profile to allow user to continue
+        return await createDefaultProfile(userId);
       }
 
       return data as UserProfile;

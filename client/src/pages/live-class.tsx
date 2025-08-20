@@ -82,6 +82,15 @@ function LiveClassContent() {
   console.log('📚 Classes from Supabase:', allClasses);
   console.log('🎯 Selected class:', selectedClass);
   
+  // Debug: Show current authentication state
+  console.log('🔐 Authentication state on live-class page:', {
+    userExists: !!user,
+    userEmail: user?.email,
+    profileExists: !!profile,
+    profileFirstName: profile?.first_name,
+    authLoading
+  });
+  
   // Show loading state while checking authentication
   if (authLoading) {
     return (
@@ -166,10 +175,23 @@ function LiveClassContent() {
   };
 
   const handleJoinClass = async () => {
-    if (!user || !profile) {
-      console.error('User authentication required');
+    if (!user) {
+      console.error('User authentication required - please login first');
+      alert('অনুগ্রহ করে প্রথমে লগইন করুন / Please login first');
+      navigate('/login');
       return;
     }
+    
+    // Use profile if available, otherwise use user data
+    const userDisplayName = profile?.first_name 
+      ? `${profile.first_name} ${profile.last_name || ''}`.trim()
+      : user.email?.split('@')[0] || 'User';
+    
+    console.log('🎯 User authenticated, proceeding to join class:', {
+      userId: user.id,
+      displayName: userDisplayName,
+      hasProfile: !!profile
+    });
 
     setIsLoading(true);
     try {
@@ -201,15 +223,15 @@ function LiveClassContent() {
         roomId: generatedRoomId,
         userId: user.id,
         userRole: isInstructor ? 'host' : 'participant',
-        displayName: profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email?.split('@')[0] || 'User'
+        displayName: userDisplayName
       });
       
       await joinRoom({
         roomId: generatedRoomId,
         userId: user.id ?? 'anonymous',
         userRole: isInstructor ? 'host' : 'participant',
-        displayName: profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email?.split('@')[0] || 'User',
-        avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.first_name || 'User')}&background=0D8ABC&color=fff`
+        displayName: userDisplayName,
+        avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userDisplayName)}&background=0D8ABC&color=fff`
       });
 
       console.log('Successfully joined real video room!');
