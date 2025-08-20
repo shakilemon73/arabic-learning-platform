@@ -91,9 +91,7 @@ export class SignalingManager extends EventEmitter {
         }
       });
 
-      if (response !== 'SUBSCRIBED') {
-        throw new Error('Failed to subscribe to signaling channel');
-      }
+      // Response handling - channel subscription is handled in the callback
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown signaling error';

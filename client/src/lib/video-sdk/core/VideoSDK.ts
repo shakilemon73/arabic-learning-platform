@@ -5,6 +5,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { EventEmitter } from './EventEmitter';
+import { WebSocketSignalingManager } from './WebSocketSignalingManager';
 
 export interface VideoSDKConfig {
   supabaseUrl: string;
@@ -66,6 +67,7 @@ export class VideoSDK extends EventEmitter {
   private isInitialized = false;
   private isConnected = false;
   private channel: any = null;
+  private wsSignaling: WebSocketSignalingManager;
 
   // WebRTC Connection Management
   private localStream: MediaStream | null = null;
@@ -116,6 +118,11 @@ export class VideoSDK extends EventEmitter {
           },
         },
       });
+
+      // Initialize WebSocket signaling manager for better real-time performance
+      this.wsSignaling = new WebSocketSignalingManager();
+      this.setupWebSocketSignaling();
+      
       this.isInitialized = true;
     } catch (error) {
       console.error('🔒 VideoSDK initialization failed:', error);
@@ -147,9 +154,9 @@ export class VideoSDK extends EventEmitter {
       console.log('🎯 Step 1: Initializing media...');
       await this.initializeMedia();
 
-      // Setup signaling
-      console.log('🎯 Step 2: Setting up signaling...');
-      await this.setupSignaling();
+      // Setup signaling (now using WebSocket + Supabase hybrid)
+      console.log('🎯 Step 2: Setting up enhanced signaling...');
+      await this.setupHybridSignaling();
 
       // Join room in database (optional)
       console.log('🎯 Step 3: Recording participation...');
@@ -210,6 +217,96 @@ export class VideoSDK extends EventEmitter {
         }
       }
       throw new Error('Failed to access camera/microphone: ' + (error as Error).message);
+    }
+  }
+
+  /**
+   * Setup WebSocket signaling event handlers
+   */
+  private setupWebSocketSignaling(): void {
+    this.wsSignaling.on('connected', (data) => {
+      console.log('✅ WebSocket signaling connected', data);
+    });
+
+    this.wsSignaling.on('room-joined', (data) => {
+      console.log('🏠 Joined room via WebSocket', data);
+    });
+
+    this.wsSignaling.on('user-joined', (data) => {
+      console.log('👤 User joined via WebSocket:', data.userId);
+      this.handleParticipantJoined({
+        userId: data.userId,
+        displayName: data.displayName,
+        role: data.role
+      });
+    });
+
+    this.wsSignaling.on('user-left', (data) => {
+      console.log('👋 User left via WebSocket:', data.userId);
+      this.handleParticipantLeft(data.userId);
+    });
+
+    this.wsSignaling.on('offer-received', (data) => {
+      console.log('📞 Received offer via WebSocket:', data.fromUserId);
+      this.handleOffer({
+        offer: data.offer,
+        fromId: data.fromUserId,
+        targetId: this.session?.userId
+      });
+    });
+
+    this.wsSignaling.on('answer-received', (data) => {
+      console.log('✅ Received answer via WebSocket:', data.fromUserId);
+      this.handleAnswer({
+        answer: data.answer,
+        fromId: data.fromUserId,
+        targetId: this.session?.userId
+      });
+    });
+
+    this.wsSignaling.on('ice-candidate-received', (data) => {
+      console.log('🧊 Received ICE candidate via WebSocket:', data.fromUserId);
+      this.handleIceCandidate({
+        candidate: data.candidate,
+        fromId: data.fromUserId,
+        targetId: this.session?.userId
+      });
+    });
+
+    this.wsSignaling.on('error', (data) => {
+      console.error('❌ WebSocket signaling error:', data.error);
+      this.emit('error', { message: data.error });
+    });
+  }
+
+  /**
+   * Setup hybrid signaling (WebSocket + Supabase fallback)
+   */
+  private async setupHybridSignaling(): Promise<void> {
+    if (!this.session) return;
+
+    // Try WebSocket signaling first
+    try {
+      console.log('🔗 Attempting WebSocket signaling connection...');
+      await this.wsSignaling.connect(
+        this.session.roomId, 
+        this.session.userId,
+        {
+          displayName: this.session.displayName,
+          role: this.session.userRole,
+          capabilities: {
+            canSpeak: true,
+            canShare: true,
+            canChat: true
+          }
+        }
+      );
+      console.log('✅ WebSocket signaling active');
+      
+    } catch (error) {
+      console.warn('⚠️ WebSocket signaling failed, falling back to Supabase:', error);
+      // Fallback to original Supabase signaling
+      await this.setupSignaling();
     }
   }
 
@@ -466,18 +563,47 @@ export class VideoSDK extends EventEmitter {
     }
   }
 
-  // Send signaling message
-  private sendSignalingMessage(event: string, payload: any): void {
+  // Send signaling message (hybrid WebSocket + Supabase)
+  private async sendSignalingMessage(event: string, payload: any): Promise<void> {
     if (!this.session) return;
 
-    this.supabase.channel(`room:${this.session.roomId}`).send({
-      type: 'broadcast',
-      event,
-      payload: {
-        ...payload,
-        fromId: this.session.userId
+    try {
+      // Try WebSocket first
+      if (this.wsSignaling.isSignalingConnected() && payload.targetId) {
+        switch (event) {
+          case 'offer':
+            await this.wsSignaling.sendOffer(payload.targetId, payload.offer);
+            break;
+          case 'answer':
+            await this.wsSignaling.sendAnswer(payload.targetId, payload.answer);
+            break;
+          case 'ice-candidate':
+            await this.wsSignaling.sendIceCandidate(payload.targetId, new RTCIceCandidate(payload.candidate));
+            break;
+        }
+      } else {
+        // Fallback to Supabase
+        this.supabase.channel(`room:${this.session.roomId}`).send({
+          type: 'broadcast',
+          event,
+          payload: {
+            ...payload,
+            fromId: this.session.userId
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.warn('⚠️ Failed to send via WebSocket, using Supabase fallback:', error);
+      // Always have Supabase as fallback
+      this.supabase.channel(`room:${this.session.roomId}`).send({
+        type: 'broadcast',
+        event,
+        payload: {
+          ...payload,
+          fromId: this.session.userId
+        }
+      });
+    }
   }
 
   // Join room in database
@@ -615,6 +741,9 @@ export class VideoSDK extends EventEmitter {
       this.localStream.getTracks().forEach(track => track.stop());
       this.localStream = null;
     }
+
+    // Disconnect WebSocket signaling
+    await this.wsSignaling.disconnect();
 
     // Leave Supabase channel
     if (this.channel) {
