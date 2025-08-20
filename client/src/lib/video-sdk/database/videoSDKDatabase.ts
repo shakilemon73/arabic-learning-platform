@@ -72,6 +72,8 @@ export const createVideoRoom = async (roomData: {
   scheduled_start_time?: Date;
   scheduled_end_time?: Date;
 }) => {
+  const roomCode = `ROOM_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  
   const { data, error } = await supabase
     .from('rooms')
     .insert({
@@ -83,7 +85,9 @@ export const createVideoRoom = async (roomData: {
       is_public: roomData.is_public || false,
       password_hash: roomData.password, // In production, hash this password
       scheduled_start_time: roomData.scheduled_start_time?.toISOString(),
-      scheduled_end_time: roomData.scheduled_end_time?.toISOString()
+      scheduled_end_time: roomData.scheduled_end_time?.toISOString(),
+      room_code: roomCode,
+      is_active: true
     })
     .select()
     .single();
@@ -289,11 +293,33 @@ export const getVideoRoomChatHistory = async (roomId: string, limit = 50) => {
 };
 
 /**
+ * Start recording a video room
+ */
+export const startVideoRoomRecording = async (roomId: string, config: any = {}) => {
+  const { data, error } = await supabase
+    .from('recording_sessions')
+    .insert({
+      room_id: roomId,
+      start_time: new Date().toISOString(),
+      duration: 0,
+      size: 0,
+      participants: ['3b077064-343c-4938-9ae0-52a866156162'], // Current user
+      config: { quality: 'high', format: 'mp4', ...config },
+      status: 'starting',
+      encrypted: true
+    })
+    .select()
+    .single();
+
+  return { data, error };
+};
+
+/**
  * Get room recordings
  */
 export const getVideoRoomRecordings = async (roomId: string) => {
   const { data, error } = await supabase
-    .from('recordings')
+    .from('recording_sessions')
     .select('*')
     .eq('room_id', roomId)
     .order('created_at', { ascending: false });
