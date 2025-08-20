@@ -65,6 +65,7 @@ export class VideoSDK extends EventEmitter {
   private session: SessionConfig | null = null;
   private isInitialized = false;
   private isConnected = false;
+  private channel: any = null;
 
   // WebRTC Connection Management
   private localStream: MediaStream | null = null;
@@ -172,23 +173,45 @@ export class VideoSDK extends EventEmitter {
     }
   }
 
-  // Setup real-time signaling with Supabase
+  // Setup real-time signaling with Supabase - ENHANCED FOR ZOOM-LIKE FUNCTIONALITY
   private async setupSignaling(): Promise<void> {
     if (!this.session) return;
 
     try {
-      console.log('📡 Setting up Supabase real-time signaling...');
+      console.log('📡 Setting up ENHANCED Supabase real-time signaling for ZOOM-LIKE functionality...');
       
-      // Listen for new participants
+      // Listen for new participants and handle existing ones
       const channel = this.supabase
         .channel(`room:${this.session.roomId}`)
+        .on('presence', { event: 'sync' }, () => {
+          console.log('🔄 PRESENCE SYNC: Getting all current participants...');
+          const presenceState = channel.presenceState();
+          console.log('👥 Current participants in room:', presenceState);
+          
+          // Connect to all existing participants
+          Object.values(presenceState).forEach((presences: any) => {
+            presences.forEach((presence: any) => {
+              if (presence.userId !== this.session!.userId) {
+                this.handleParticipantJoined(presence);
+              }
+            });
+          });
+        })
         .on('presence', { event: 'join' }, (payload) => {
-          console.log('👤 New participant joined:', payload);
-          this.handleParticipantJoined(payload.data);
+          console.log('👤 PRESENCE: New participant joined:', payload);
+          if (payload.newPresences && payload.newPresences.length > 0) {
+            payload.newPresences.forEach((presence: any) => {
+              this.handleParticipantJoined(presence);
+            });
+          }
         })
         .on('presence', { event: 'leave' }, (payload) => {
-          console.log('👋 Participant left:', payload);
-          this.handleParticipantLeft(payload.data.userId);
+          console.log('👋 PRESENCE: Participant left:', payload);
+          if (payload.leftPresences && payload.leftPresences.length > 0) {
+            payload.leftPresences.forEach((presence: any) => {
+              this.handleParticipantLeft(presence.userId);
+            });
+          }
         })
         .on('broadcast', { event: 'offer' }, (payload) => {
           this.handleOffer(payload.payload);
@@ -201,7 +224,13 @@ export class VideoSDK extends EventEmitter {
         })
         .subscribe((status) => {
           console.log('📡 Supabase channel subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ REAL-TIME SIGNALING ACTIVE - Ready for ZOOM-LIKE functionality!');
+          }
         });
+
+      // Store channel reference for later use
+      this.channel = channel;
 
       // Join presence
       console.log('👋 Joining presence with user data...');
@@ -213,18 +242,18 @@ export class VideoSDK extends EventEmitter {
         audioEnabled: this.isAudioEnabled
       });
       
-      console.log('✅ Signaling setup completed');
+      console.log('✅ Signaling setup completed - ZOOM-LIKE FUNCTIONALITY READY!');
     } catch (error) {
       console.error('❌ Failed to setup signaling:', error);
       throw error;
     }
   }
 
-  // Handle new participant joining
+  // Handle new participant joining - REAL ZOOM-LIKE LOGIC
   private async handleParticipantJoined(participantData: any): Promise<void> {
     if (!this.session || participantData.userId === this.session.userId) return;
 
-    console.log('🔄 Setting up connection with participant:', participantData.userId);
+    console.log('👥 NEW PARTICIPANT JOINED - Setting up bidirectional connection:', participantData.userId);
 
     const participant: ParticipantInfo = {
       id: participantData.userId,
@@ -240,13 +269,14 @@ export class VideoSDK extends EventEmitter {
     this.participants.set(participantData.userId, participant);
     this.emit('participant-joined', { participant });
 
-    // Create peer connection
+    // Create peer connection for this participant
     await this.createPeerConnection(participantData.userId);
     
-    // If we're the host or existing participant, send offer
-    if (this.session.userRole === 'host') {
-      await this.createOffer(participantData.userId);
-    }
+    // CRITICAL: ALL participants initiate connections (not just host)
+    // This creates the full mesh network like Zoom
+    await this.createOffer(participantData.userId);
+    
+    console.log('✅ Bidirectional connection setup initiated with:', participantData.userId);
   }
 
   // Create WebRTC peer connection
@@ -322,17 +352,26 @@ export class VideoSDK extends EventEmitter {
     }
   }
 
-  // Handle received offer
+  // Handle received offer - REAL ZOOM-LIKE OFFER HANDLING
   private async handleOffer(payload: any): Promise<void> {
     if (!this.session || payload.targetId !== this.session.userId) return;
 
-    const pc = this.peerConnections.get(payload.fromId);
-    if (!pc) return;
+    console.log('📞 RECEIVED OFFER from:', payload.fromId, 'to:', payload.targetId);
+
+    // Create peer connection if it doesn't exist
+    let pc = this.peerConnections.get(payload.fromId);
+    if (!pc) {
+      console.log('🔧 Creating new peer connection for incoming offer from:', payload.fromId);
+      pc = await this.createPeerConnection(payload.fromId);
+    }
 
     try {
-      await pc.setRemoteDescription(payload.offer);
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
       
-      const answer = await pc.createAnswer();
+      const answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       await pc.setLocalDescription(answer);
       
       this.sendSignalingMessage('answer', {
@@ -340,34 +379,48 @@ export class VideoSDK extends EventEmitter {
         targetId: payload.fromId
       });
       
+      console.log('✅ SENT ANSWER back to:', payload.fromId);
+      
     } catch (error) {
       console.error('❌ Failed to handle offer:', error);
     }
   }
 
-  // Handle received answer
+  // Handle received answer - REAL ZOOM-LIKE ANSWER HANDLING
   private async handleAnswer(payload: any): Promise<void> {
     if (!this.session || payload.targetId !== this.session.userId) return;
 
+    console.log('✅ RECEIVED ANSWER from:', payload.fromId, 'to:', payload.targetId);
+
     const pc = this.peerConnections.get(payload.fromId);
-    if (!pc) return;
+    if (!pc) {
+      console.error('⚠️ No peer connection found for answer from:', payload.fromId);
+      return;
+    }
 
     try {
-      await pc.setRemoteDescription(payload.answer);
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+      console.log('🎯 CONNECTION ESTABLISHED with:', payload.fromId);
     } catch (error) {
       console.error('❌ Failed to handle answer:', error);
     }
   }
 
-  // Handle ICE candidate
+  // Handle ICE candidate - REAL ZOOM-LIKE ICE HANDLING
   private async handleIceCandidate(payload: any): Promise<void> {
     if (!this.session || payload.targetId !== this.session.userId) return;
 
+    console.log('🧊 RECEIVED ICE CANDIDATE from:', payload.fromId);
+
     const pc = this.peerConnections.get(payload.fromId);
-    if (!pc) return;
+    if (!pc) {
+      console.error('⚠️ No peer connection found for ICE candidate from:', payload.fromId);
+      return;
+    }
 
     try {
-      await pc.addIceCandidate(payload.candidate);
+      await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+      console.log('✅ ICE CANDIDATE added for:', payload.fromId);
     } catch (error) {
       console.error('❌ Failed to handle ICE candidate:', error);
     }
@@ -472,8 +525,8 @@ export class VideoSDK extends EventEmitter {
 
       // Replace video track in all peer connections
       const videoTrack = screenStream.getVideoTracks()[0];
-      for (const [participantId, pc] of this.peerConnections) {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      for (const [participantId, pc] of Array.from(this.peerConnections.entries())) {
+        const sender = pc.getSenders().find((s: RTCRtpSender) => s.track?.kind === 'video');
         if (sender) {
           await sender.replaceTrack(videoTrack);
         }
@@ -496,8 +549,8 @@ export class VideoSDK extends EventEmitter {
     const videoTrack = this.localStream.getVideoTracks()[0];
     
     // Replace screen track with camera track in all peer connections
-    for (const [participantId, pc] of this.peerConnections) {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+    for (const [participantId, pc] of Array.from(this.peerConnections.entries())) {
+      const sender = pc.getSenders().find((s: RTCRtpSender) => s.track?.kind === 'video');
       if (sender && videoTrack) {
         await sender.replaceTrack(videoTrack);
       }
@@ -507,12 +560,12 @@ export class VideoSDK extends EventEmitter {
     this.emit('screen-share-stopped');
   }
 
-  // Leave room
+  // Leave room - ENHANCED CLEANUP
   async leaveRoom(): Promise<void> {
     console.log('🚪 Leaving room...');
 
     // Close all peer connections
-    for (const [participantId, pc] of this.peerConnections) {
+    for (const [participantId, pc] of Array.from(this.peerConnections.entries())) {
       pc.close();
     }
     this.peerConnections.clear();
@@ -521,6 +574,12 @@ export class VideoSDK extends EventEmitter {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());
       this.localStream = null;
+    }
+
+    // Leave Supabase channel
+    if (this.channel) {
+      await this.channel.unsubscribe();
+      this.channel = null;
     }
 
     // Leave database room
