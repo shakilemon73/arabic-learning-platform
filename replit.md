@@ -5,6 +5,8 @@ This project is an Arabic language learning platform with live online classes, d
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Code style: Clean, focused implementation without demo components.
+Enterprise video: Production-grade features with direct Supabase integration.
 
 # System Architecture
 
