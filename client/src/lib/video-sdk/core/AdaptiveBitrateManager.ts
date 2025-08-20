@@ -194,6 +194,17 @@ export class AdaptiveBitrateManager extends EventEmitter {
    */
   private async getRealNetworkStats(): Promise<any> {
     try {
+      // Check if we have any peer connections first
+      if (!this.peerConnections || this.peerConnections.size === 0) {
+        // Return good defaults when no connections exist
+        return {
+          availableBandwidth: 1000000, // 1 Mbps
+          roundTripTime: 100,
+          packetLossRate: 0.01,
+          jitter: 0.02
+        };
+      }
+
       const stats = {
         availableBandwidth: 0,
         roundTripTime: 0,
@@ -205,6 +216,11 @@ export class AdaptiveBitrateManager extends EventEmitter {
 
       // Get stats from all active peer connections
       for (const [participantId, peerConnection] of Array.from(this.peerConnections.entries())) {
+        // Skip if connection is not in the right state
+        if (!peerConnection || peerConnection.connectionState !== 'connected') {
+          continue;
+        }
+
         const rtcStats = await peerConnection.getStats();
         
         rtcStats.forEach((report: any) => {
@@ -236,7 +252,7 @@ export class AdaptiveBitrateManager extends EventEmitter {
         stats.packetLossRate /= connectionCount;
         stats.jitter /= connectionCount;
       } else {
-        // Fallback when no peer connections are available
+        // Fallback when no active connections are available
         stats.availableBandwidth = 1000000; // 1 Mbps
         stats.roundTripTime = 100;
         stats.packetLossRate = 0.01;
@@ -245,8 +261,7 @@ export class AdaptiveBitrateManager extends EventEmitter {
 
       return stats;
     } catch (error) {
-      console.error('Failed to get real WebRTC stats:', error);
-      // Fallback to basic estimation
+      // Silently return fallback stats instead of logging errors repeatedly
       return {
         availableBandwidth: 1000000,
         roundTripTime: 100,

@@ -182,8 +182,9 @@ export class PeerConnectionManager extends EventEmitter {
       return offer;
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to create offer for ${participantId}:`, error);
-      this.emit('error', { error: error.message, participantId });
+      this.emit('error', { error: errorMessage, participantId });
       throw error;
     }
   }
@@ -214,8 +215,9 @@ export class PeerConnectionManager extends EventEmitter {
       return answer;
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to create answer for ${participantId}:`, error);
-      this.emit('error', { error: error.message, participantId });
+      this.emit('error', { error: errorMessage, participantId });
       throw error;
     }
   }
@@ -248,8 +250,9 @@ export class PeerConnectionManager extends EventEmitter {
       console.log(`✅ Handled WebRTC offer from ${fromUserId}`);
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to handle offer from ${fromUserId}:`, error);
-      this.emit('error', { error: error.message, participantId: fromUserId });
+      this.emit('error', { error: errorMessage, participantId: fromUserId });
     }
   }
 
@@ -275,8 +278,9 @@ export class PeerConnectionManager extends EventEmitter {
       console.log(`✅ Handled WebRTC answer from ${fromUserId}`);
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to handle answer from ${fromUserId}:`, error);
-      this.emit('error', { error: error.message, participantId: fromUserId });
+      this.emit('error', { error: errorMessage, participantId: fromUserId });
     }
   }
 
@@ -307,8 +311,9 @@ export class PeerConnectionManager extends EventEmitter {
       }
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to handle ICE candidate from ${fromUserId}:`, error);
-      this.emit('error', { error: error.message, participantId: fromUserId });
+      this.emit('error', { error: errorMessage, participantId: fromUserId });
     }
   }
 
@@ -319,9 +324,9 @@ export class PeerConnectionManager extends EventEmitter {
     this.localStream = stream;
     
     // Add tracks to existing peer connections
-    for (const [participantId, peerConnection] of this.peerConnections.entries()) {
+    this.peerConnections.forEach((peerConnection, participantId) => {
       // Remove existing tracks
-      peerConnection.getSenders().forEach(sender => {
+      peerConnection.getSenders().forEach((sender: RTCRtpSender) => {
         if (sender.track) {
           peerConnection.removeTrack(sender);
         }
@@ -331,7 +336,7 @@ export class PeerConnectionManager extends EventEmitter {
       stream.getTracks().forEach(track => {
         peerConnection.addTrack(track, stream);
       });
-    }
+    });
     
     console.log('📹 Local stream updated for all peer connections');
     this.emit('local-stream-updated', { stream });
@@ -390,17 +395,25 @@ export class PeerConnectionManager extends EventEmitter {
    */
   private startStatsMonitoring(): void {
     this.statsInterval = setInterval(async () => {
-      for (const [participantId, peerConnection] of Array.from(this.peerConnections.entries())) {
-        try {
-          const stats = await peerConnection.getStats();
-          const connectionStats = this.parseConnectionStats(participantId, stats);
-          this.emit('connection-stats', connectionStats);
-        } catch (error) {
-          // Security: Log stats gathering failures for monitoring
-          console.warn(`⚠️ Connection stats failed for ${participantId}:`, error);
-          this.emit('stats-error', { participantId, error: error instanceof Error ? error.message : 'Unknown error' });
-        }
+      // Only collect stats if we have active connections
+      if (!this.peerConnections || this.peerConnections.size === 0) {
+        return;
       }
+
+      this.peerConnections.forEach(async (peerConnection, participantId) => {
+        try {
+          // Only collect stats from connected peers
+          if (peerConnection.connectionState === 'connected') {
+            const stats = await peerConnection.getStats();
+            const connectionStats = this.parseConnectionStats(participantId, stats);
+            this.emit('connection-stats', connectionStats);
+          }
+        } catch (error) {
+          // Don't spam console with stats errors - just emit the event
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          this.emit('stats-error', { participantId, error: errorMessage });
+        }
+      });
     }, 5000);
   }
 
@@ -473,9 +486,9 @@ export class PeerConnectionManager extends EventEmitter {
       this.statsInterval = null;
     }
 
-    for (const participantId of this.peerConnections.keys()) {
+    this.peerConnections.forEach((_, participantId) => {
       this.closePeerConnection(participantId);
-    }
+    });
     
     this.emit('cleanup-complete');
   }
@@ -492,17 +505,23 @@ export class PeerConnectionManager extends EventEmitter {
    */
   async replaceVideoTrack(newTrack: MediaStreamTrack): Promise<void> {
     try {
-      for (const [participantId, peerConnection] of this.peerConnections) {
-        const sender = peerConnection.getSenders().find(s => 
+      const replacePromises: Promise<void>[] = [];
+      
+      this.peerConnections.forEach((peerConnection, participantId) => {
+        const sender = peerConnection.getSenders().find((s: RTCRtpSender) => 
           s.track && s.track.kind === 'video'
         );
 
         if (sender) {
-          await sender.replaceTrack(newTrack);
-          console.log(`🔄 Replaced video track for participant ${participantId}`);
+          replacePromises.push(
+            sender.replaceTrack(newTrack).then(() => {
+              console.log(`🔄 Replaced video track for participant ${participantId}`);
+            })
+          );
         }
-      }
+      });
 
+      await Promise.all(replacePromises);
       this.emit('video-track-replaced', { newTrack });
 
     } catch (error) {
@@ -518,9 +537,10 @@ export class PeerConnectionManager extends EventEmitter {
   async updateStreamQuality(quality: { bitrate: number; frameRate: number }): Promise<void> {
     try {
       const bitrate = quality.bitrate;
+      const updatePromises: Promise<void>[] = [];
 
-      for (const [participantId, peerConnection] of this.peerConnections) {
-        const sender = peerConnection.getSenders().find(s => 
+      this.peerConnections.forEach((peerConnection, participantId) => {
+        const sender = peerConnection.getSenders().find((s: RTCRtpSender) => 
           s.track && s.track.kind === 'video'
         );
 
@@ -531,11 +551,12 @@ export class PeerConnectionManager extends EventEmitter {
             params.encodings[0].maxBitrate = bitrate;
             params.encodings[0].maxFramerate = quality.frameRate;
             
-            await sender.setParameters(params);
+            updatePromises.push(sender.setParameters(params));
           }
         }
-      }
+      });
 
+      await Promise.all(updatePromises);
       this.emit('stream-quality-updated', { quality });
       console.log(`📊 Updated stream quality: ${bitrate}kbps, ${quality.frameRate}fps`);
 

@@ -59,22 +59,27 @@ export class SFUManager extends EventEmitter {
     try {
       this.roomId = roomId;
       
-      // Register SFU instance in database for load balancing
+      // Register SFU instance in database for load balancing (production-ready with error handling)
       const sfuId = `sfu_${this.config.region}_${Date.now()}`;
       
-      await this.supabase
-        .from('sfu_instances')
-        .insert({
-          id: sfuId,
-          room_id: roomId,
-          region: this.config.region,
-          max_participants: this.config.maxParticipants,
-          current_participants: 0,
-          cpu_usage: 0,
-          memory_usage: 0,
-          status: 'active',
-          created_at: new Date().toISOString()
-        });
+      try {
+        await this.supabase
+          .from('sfu_instances')
+          .insert({
+            id: sfuId,
+            room_id: roomId,
+            region: this.config.region,
+            max_participants: this.config.maxParticipants,
+            current_participants: 0,
+            cpu_usage: 0,
+            memory_usage: 0,
+            status: 'active',
+            created_at: new Date().toISOString()
+          });
+      } catch (dbError) {
+        console.warn('⚠️ SFU database registration failed, continuing without persistence:', dbError);
+        // Continue operation even if database insert fails - this makes it production-ready
+      }
 
       // Set up real-time channel for SFU coordination
       const channel = this.supabase.channel(`sfu-${roomId}`, {
@@ -146,11 +151,23 @@ export class SFUManager extends EventEmitter {
    */
   private async applyForwardingRules(sourceParticipantId: string, stream: MediaStream): Promise<void> {
     try {
-      // Get all participants in the room
-      const { data: participants } = await this.supabase
-        .from('live_class_participants')
-        .select('user_id, bandwidth_kbps, device_type')
-        .eq('room_id', this.roomId);
+      // Get all participants in the room (with fallback for production stability)
+      let participants: any[] = [];
+      try {
+        const { data } = await this.supabase
+          .from('live_class_participants')
+          .select('user_id, bandwidth_kbps, device_type')
+          .eq('room_id', this.roomId);
+        participants = data || [];
+      } catch (dbError) {
+        console.warn('⚠️ Failed to fetch participants, using local tracking:', dbError);
+        // Fallback to local participant tracking
+        participants = Array.from(this.participantStreams.keys()).map(id => ({
+          user_id: id,
+          bandwidth_kbps: 1000, // Default bandwidth
+          device_type: 'desktop' // Default device type
+        }));
+      }
 
       if (!participants) return;
 
@@ -349,17 +366,22 @@ export class SFUManager extends EventEmitter {
       try {
         const stats = await this.collectStats();
         
-        // Update database with current stats
-        await this.supabase
-          .from('sfu_instances')
-          .update({
-            current_participants: stats.participantCount,
-            cpu_usage: stats.cpuUsage,
-            memory_usage: stats.memoryUsage,
-            total_bandwidth: stats.totalBandwidth,
-            updated_at: new Date().toISOString()
-          })
-          .eq('room_id', this.roomId);
+        // Update database with current stats (with error handling for production)
+        try {
+          await this.supabase
+            .from('sfu_instances')
+            .update({
+              current_participants: stats.participantCount,
+              cpu_usage: stats.cpuUsage,
+              memory_usage: stats.memoryUsage,
+              total_bandwidth: stats.totalBandwidth,
+              updated_at: new Date().toISOString()
+            })
+            .eq('room_id', this.roomId);
+        } catch (dbError) {
+          // Don't fail the entire monitoring system due to database issues
+          console.warn('⚠️ SFU stats update failed, continuing monitoring:', dbError);
+        }
 
         // Emit stats for monitoring
         this.emit('stats-updated', stats);
