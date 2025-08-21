@@ -141,6 +141,86 @@ export const updateClassParticipants = async (classId: string, increment: boolea
   return data;
 };
 
+// Admin class management functions
+export const createLiveClass = async (classData: Omit<LiveClass, 'id' | 'created_at' | 'current_participants'>) => {
+  try {
+    const { data, error } = await supabase
+      .from('live_classes')
+      .insert({
+        ...classData,
+        current_participants: 0
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error creating live class:', error);
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    console.error('Failed to create live class:', error);
+    throw error;
+  }
+};
+
+export const updateLiveClass = async (classId: string, updates: Partial<LiveClass>) => {
+  try {
+    const { data, error } = await supabase
+      .from('live_classes')
+      .update(updates)
+      .eq('id', classId)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error updating live class:', error);
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    console.error('Failed to update live class:', error);
+    throw error;
+  }
+};
+
+export const deleteLiveClass = async (classId: string) => {
+  try {
+    const { error } = await supabase
+      .from('live_classes')
+      .delete()
+      .eq('id', classId);
+      
+    if (error) {
+      console.error('Error deleting live class:', error);
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to delete live class:', error);
+    throw error;
+  }
+};
+
+export const getAllInstructors = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('instructors')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+      
+    if (error) {
+      console.error('Error fetching instructors:', error);
+      throw error;
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch instructors:', error);
+    throw error;
+  }
+};
+
 // Attendance functions
 export const getUserAttendance = async (userId: string): Promise<AttendanceWithClass[]> => {
   const { data, error } = await supabase

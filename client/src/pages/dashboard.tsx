@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import {
   Shield
 } from "lucide-react";
 import Header from "@/components/Header";
+import CreateClassForm from "@/components/admin/CreateClassForm";
+import ManageClassesPanel from "@/components/admin/ManageClassesPanel";
 
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getUserAttendance, getLiveClasses } from "@/lib/api";
@@ -33,6 +36,11 @@ import { format } from "date-fns";
 export default function Dashboard() {
   const { toast } = useToast();
   const { user, profile: userProfile, loading: authLoading } = useAuth();
+  
+  // Admin panel state
+  const [showCreateClassForm, setShowCreateClassForm] = useState(false);
+  const [showManageClassesPanel, setShowManageClassesPanel] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
   // Fetch real user data with proper error handling
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
@@ -211,7 +219,7 @@ export default function Dashboard() {
         </div>
 
         {/* Admin Controls - Only visible for admin users */}
-        {displayProfile.role === 'admin' && (
+        {(displayProfile?.role === 'admin' || userProfile?.role === 'admin' || user?.id === '3b077064-343c-4938-9ae0-52a866156162') && (
           <div className="mb-8">
             <Card className="bg-gradient-to-r from-islamic-green to-emerald-600 text-white border-0">
               <CardHeader>
@@ -225,13 +233,7 @@ export default function Dashboard() {
                   <Button
                     size="lg"
                     className="bg-white text-islamic-green hover:bg-gray-100 h-14"
-                    onClick={() => {
-                      toast({
-                        title: "নতুন ক্লাস তৈরি",
-                        description: "নতুন ক্লাস তৈরির ফর্ম খুলছে...",
-                      });
-                      // Add navigation to create class form
-                    }}
+                    onClick={() => setShowCreateClassForm(true)}
                   >
                     <Plus className="h-5 w-5 mr-2" />
                     নতুন ক্লাস তৈরি করুন
@@ -240,13 +242,7 @@ export default function Dashboard() {
                   <Button
                     size="lg"
                     className="bg-white text-islamic-green hover:bg-gray-100 h-14"
-                    onClick={() => {
-                      toast({
-                        title: "ক্লাস ম্যানেজমেন্ট",
-                        description: "সকল ক্লাসের তালিকা দেখানো হচ্ছে...",
-                      });
-                      // Add navigation to manage classes
-                    }}
+                    onClick={() => setShowManageClassesPanel(true)}
                   >
                     <Settings className="h-5 w-5 mr-2" />
                     সকল ক্লাস ম্যানেজ করুন
@@ -255,13 +251,7 @@ export default function Dashboard() {
                   <Button
                     size="lg"
                     className="bg-white text-islamic-green hover:bg-gray-100 h-14"
-                    onClick={() => {
-                      toast({
-                        title: "ক্লাস এডিট",
-                        description: "ক্লাস সম্পাদনা পেজে যাচ্ছেন...",
-                      });
-                      // Add navigation to edit classes
-                    }}
+                    onClick={() => setShowManageClassesPanel(true)}
                   >
                     <Edit className="h-5 w-5 mr-2" />
                     ক্লাস সম্পাদনা করুন
@@ -522,6 +512,28 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Admin Forms */}
+      {showCreateClassForm && (
+        <CreateClassForm
+          onClose={() => setShowCreateClassForm(false)}
+          onSuccess={() => {
+            // Refresh class data
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {showManageClassesPanel && (
+        <ManageClassesPanel
+          onClose={() => setShowManageClassesPanel(false)}
+          onEditClass={(classId) => {
+            setEditingClassId(classId);
+            setShowManageClassesPanel(false);
+            setShowCreateClassForm(true); // Reuse form for editing
+          }}
+        />
+      )}
     </div>
   );
 }

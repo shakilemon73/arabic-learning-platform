@@ -12,6 +12,7 @@ export interface User {
   course_progress: number;
   classes_attended: number;
   certificate_score: number;
+  role: string;
   created_at: string;
   updated_at: string;
 }
