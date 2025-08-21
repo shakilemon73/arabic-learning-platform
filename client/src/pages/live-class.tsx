@@ -182,6 +182,7 @@ function LiveClassContent() {
       
       // Join video room
       console.log('Joining video room:', enterpriseRoomId);
+      console.log(`🎬 DEBUG: live-class.tsx calling joinRoom() with userId: "${user.id}", displayName: "${userDisplayName}"`);
       await joinRoom({
         roomId: enterpriseRoomId,
         userId: user.id,

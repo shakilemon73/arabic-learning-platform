@@ -102,10 +102,13 @@ export class VideoConferenceSDK {
   async joinRoom(roomId: string, userId: string, displayName: string, role: 'host' | 'moderator' | 'participant' = 'participant'): Promise<void> {
     try {
       console.log(`🎯 Joining conference room: ${roomId}`);
+      console.log(`👤 DEBUG: VideoSDK.joinRoom() - userId: "${userId}", displayName: "${displayName}"`);
       
       this.roomId = roomId;
       this.userId = userId;
       this.displayName = displayName;
+      
+      console.log(`💾 DEBUG: Stored in VideoSDK - this.userId: "${this.userId}", this.displayName: "${this.displayName}"`);
 
       // Initialize local media
       await this.initializeLocalMedia();
@@ -228,14 +231,16 @@ export class VideoConferenceSDK {
           console.log('📡 Signaling channel status:', status);
           if (status === 'SUBSCRIBED') {
             // Join presence
-            await channel.track({
+            const presenceData = {
               userId: this.userId,
               displayName: this.displayName,
               videoEnabled: this.isVideoEnabled,
               audioEnabled: this.isAudioEnabled,
               screenSharing: this.isScreenSharing,
               joinedAt: new Date().toISOString()
-            });
+            };
+            console.log(`📡 DEBUG: Supabase presence track() - data:`, presenceData);
+            await channel.track(presenceData);
             console.log('✅ Real-time signaling active');
           }
         });
@@ -255,6 +260,14 @@ export class VideoConferenceSDK {
     if (!this.roomId || !this.userId) return;
 
     try {
+      const dbData = {
+        room_id: this.roomId,
+        user_id: this.userId,
+        display_name: this.displayName,
+        role: role
+      };
+      console.log(`💽 DEBUG: Database insert - data:`, dbData);
+      
       await this.supabase
         .from('video_conference_participants')
         .insert({
@@ -281,7 +294,13 @@ export class VideoConferenceSDK {
    * Handle new participant joining
    */
   private async handleParticipantJoined(participantData: any): Promise<void> {
-    if (!this.userId || participantData.userId === this.userId) return;
+    console.log(`🔄 DEBUG: handleParticipantJoined() - incoming:`, participantData);
+    console.log(`🔄 DEBUG: My userId: "${this.userId}", Their userId: "${participantData.userId}"`);
+    
+    if (!this.userId || participantData.userId === this.userId) {
+      console.log(`⏭️ DEBUG: Skipping self or invalid participant`);
+      return;
+    }
 
     console.log('👥 Handling new participant:', participantData.userId);
 
