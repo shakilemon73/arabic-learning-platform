@@ -34,12 +34,41 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint
+// Health check endpoint with WebSocket status
 app.get('/api/health', (req, res) => {
+  const connectedClients = Array.from(rooms.values()).reduce((total, room) => total + room.size, 0);
+  
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    websocket: {
+      connected_clients: connectedClients,
+      active_rooms: rooms.size,
+      server_ready: true
+    },
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// WebSocket health check endpoint
+app.get('/api/ws-health', (req, res) => {
+  const roomsStatus = Array.from(rooms.entries()).map(([roomId, participants]) => ({
+    roomId,
+    participants: participants.size,
+    users: Array.from(participants.values()).map(p => ({
+      userId: p.userId,
+      displayName: p.displayName,
+      role: p.role,
+      joinedAt: p.joinedAt
+    }))
+  }));
+  
+  res.json({
+    status: 'healthy',
+    websocket_server: 'running',
+    rooms: roomsStatus,
+    total_participants: Array.from(rooms.values()).reduce((total, room) => total + room.size, 0)
   });
 });
 

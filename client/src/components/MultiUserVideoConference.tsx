@@ -83,36 +83,96 @@ export const MultiUserVideoConference: React.FC<MultiUserVideoConferenceProps> =
     try {
       console.log('🎥 Initializing local media stream...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('getUserMedia is not supported in this browser');
+      }
+      
+      // Get optimal constraints based on actual device capabilities
+      const deviceManager = (await import('@/lib/deviceManager')).DeviceManager.getInstance();
+      
+      // Check browser support first
+      if (!deviceManager.checkBrowserSupport()) {
+        throw new Error('WebRTC not supported in this browser. Please use Chrome, Firefox, or Safari.');
+      }
+      
+      // Test device access
+      const deviceTest = await deviceManager.testDeviceAccess();
+      if (!deviceTest.video && !deviceTest.audio) {
+        throw new Error(deviceTest.error || 'No video or audio devices found');
+      }
+      
+      console.log('📱 Device capabilities:', deviceTest);
+      
+      // Get optimal constraints for this device
+      const constraints = await deviceManager.getOptimalConstraints();
+      
+      let stream: MediaStream | null = null;
+      let lastError: Error | null = null;
+      
+      for (const constraint of constraints) {
+        try {
+          console.log('🔄 Trying media constraint:', constraint);
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          console.log('✅ Media stream acquired successfully');
+          break;
+        } catch (error) {
+          console.warn('⚠️ Failed with constraint, trying next:', error);
+          lastError = error as Error;
+          continue;
         }
-      });
+      }
+      
+      if (!stream) {
+        throw lastError || new Error('Failed to access any media devices');
+      }
       
       setLocalStream(stream);
       
-      // Set local video
+      // Set initial media states based on actual tracks
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      
+      if (videoTrack) {
+        setIsVideoEnabled(videoTrack.enabled);
+        console.log('📹 Video track available and enabled');
+      } else {
+        console.log('📹 No video track available');
+        setIsVideoEnabled(false);
+      }
+      
+      if (audioTrack) {
+        setIsAudioEnabled(audioTrack.enabled);
+        console.log('🎤 Audio track available and enabled');
+      } else {
+        console.log('🎤 No audio track available');
+        setIsAudioEnabled(false);
+      }
+      
+      // Set local video element
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
       
-      console.log('✅ Local media stream initialized');
+      console.log('✅ Local media stream initialized successfully');
       return stream;
       
     } catch (error) {
       console.error('❌ Failed to get local media stream:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let userMessage = "ক্যামেরা এবং মাইক্রোফোন অ্যাক্সেসের অনুমতি প্রয়োজন";
+      
+      // Production error handling using DeviceManager
+      const deviceManager = (await import('@/lib/deviceManager')).DeviceManager.getInstance();
+      userMessage = deviceManager.getErrorMessage(error as Error);
+      
       toast({
-        title: "মিডিয়া অ্যাক্সেস ত্রুটি",
-        description: "ক্যামেরা/মাইক্রোফোন অ্যাক্সেস করতে পারেনি",
+        title: "মিডিয়া অ্যাক্সেস ব্যর্থ",
+        description: userMessage,
         variant: "destructive"
       });
+      
       throw error;
     }
   }, [toast]);
