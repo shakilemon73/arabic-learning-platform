@@ -189,7 +189,7 @@ function LiveClassContent() {
         userId: user.id,
         userRole: isInstructor ? 'host' : 'participant',
         displayName: userDisplayName,
-        avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userDisplayName)}&background=0D8ABC&color=fff`
+        avatar: profile?.profile_image_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userDisplayName)}&background=0D8ABC&color=fff`
       });
 
       // Register participant in enterprise database
