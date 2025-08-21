@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, BookOpen, Monitor, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { Home, BookOpen, Monitor, Video, User, LogOut, LogIn, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,6 +21,7 @@ export default function Header() {
     { href: "/", label: "হোম", icon: Home, active: location === "/" },
     { href: "/dashboard", label: "ড্যাশবোর্ড", icon: BookOpen, active: location === "/dashboard", requireAuth: true },
     { href: "/live-class", label: "লাইভ ক্লাস", icon: Monitor, active: location === "/live-class", requireAuth: true },
+    { href: "/video-meet", label: "ভিডিও কনফারেন্স", icon: Video, active: location === "/video-meet", requireAuth: true },
   ];
 
   const handleSignOut = async () => {

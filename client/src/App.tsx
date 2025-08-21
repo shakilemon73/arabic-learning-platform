@@ -14,6 +14,7 @@ import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
 import EnterpriseMeet from "@/pages/enterprise-meet";
+import VideoMeet from "@/pages/video-meet";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
@@ -50,6 +51,12 @@ function Router() {
       <Route path="/enterprise-meet">
         <AuthGuard>
           <EnterpriseMeet />
+        </AuthGuard>
+      </Route>
+      
+      <Route path="/video-meet">
+        <AuthGuard>
+          <VideoMeet />
         </AuthGuard>
       </Route>
       
