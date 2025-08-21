@@ -73,29 +73,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const { toast } = useToast();
 
-  // Fetch user profile from database
+  // Fetch user profile from database with timeout
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       console.log('🔍 Fetching user profile for:', userId);
       
-      // Try users table first (correct table name)
-      let { data, error } = await supabase
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+      
+      const fetchPromise = supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single();
 
-      // If users table doesn't exist, try user_profiles table as fallback
-      if (error && error.code === 'PGRST205') {
-        console.log('🔄 Trying user_profiles table instead...');
-        const result = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-        data = result.data;
-        error = result.error;
-      }
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
         console.error('⚠️ Error fetching user profile:', error);
@@ -520,25 +514,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     console.log('🔐 Initializing authentication system...');
     
-    let retryCount = 0;
-    const maxRetries = 3;
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
     
-    // Get initial session with retry mechanism for SPA reliability
+    // Emergency timeout to prevent infinite loading on SPA refresh
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.log('⏰ Emergency timeout - forcing auth completion');
+        setState(prev => ({ ...prev, loading: false }));
+      }
+    }, 3000);
+    
+    // Get initial session with improved SPA handling
     const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // First try to get session with a timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 2000)
+        );
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (!mounted) return;
+        
+        if (timeoutId) clearTimeout(timeoutId);
         
         if (error) {
           console.error('Error getting session:', error);
-          
-          // Retry session recovery for SPA
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(`🔄 Retrying session recovery (${retryCount}/${maxRetries})...`);
-            setTimeout(initializeAuth, 1000 * retryCount);
-            return;
-          }
-          
           setState(prev => ({ ...prev, loading: false, error }));
           return;
         }
@@ -553,18 +556,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch (error) {
         console.error('Error initializing auth:', error);
         
-        // Retry on network/connection issues common in SPAs
-        if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`🔄 Retrying due to network error (${retryCount}/${maxRetries})...`);
-          setTimeout(initializeAuth, 1000 * retryCount);
-          return;
-        }
+        if (!mounted) return;
         
+        if (timeoutId) clearTimeout(timeoutId);
+        
+        // For SPA refreshes, try to continue without session
         setState(prev => ({ 
           ...prev, 
-          loading: false, 
-          error: error as AuthError 
+          loading: false,
+          error: null // Don't show error for timeout on refresh
         }));
       }
     };
@@ -608,6 +608,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     );
 
     return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

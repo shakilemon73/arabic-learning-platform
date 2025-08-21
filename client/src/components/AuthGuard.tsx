@@ -132,7 +132,7 @@ export default function AuthGuard({
     }
   }, [loading, requireAuth, user, redirectTo, setLocation]);
 
-  // Security: Enhanced timeout with proper validation
+  // Improved timeout handling for SPA refreshes
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -140,9 +140,15 @@ export default function AuthGuard({
       timeoutId = setTimeout(async () => {
         console.log('⏰ AuthGuard: Loading timeout reached, validating session...');
         
-        // Security: Validate session before forcing resolution
+        // Quick session check for SPA refreshes
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const sessionPromise = supabase.auth.getSession();
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Session check timeout')), 1000)
+          );
+          
+          const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+          
           if (session?.user) {
             console.log('✅ Valid session found during timeout, allowing access');
             setForceNoLoading(true);
@@ -152,9 +158,10 @@ export default function AuthGuard({
           }
         } catch (error) {
           console.error('🔒 Session validation error during timeout:', error);
-          setForceNoLoading(false);
+          // For SPA refreshes, don't block indefinitely
+          setForceNoLoading(!requireAuth);
         }
-      }, 8000); // Increased to 8 seconds for better reliability
+      }, 4000); // Reduced to 4 seconds for better SPA performance
     } else {
       setForceNoLoading(false);
     }
@@ -162,7 +169,7 @@ export default function AuthGuard({
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [loading]);
+  }, [loading, requireAuth]);
 
   console.log('🛡️ AuthGuard check:', {
     user: !!user,
