@@ -199,13 +199,8 @@ export class VideoConferenceSDK extends EventEmitter {
       // Check if room exists, create if doesn't exist and user is admin
       await this.ensureRoomExists(role);
 
-      // Initialize local media using enterprise MediaManager
-      await this.mediaManager.initialize();
-      const stream = await this.mediaManager.getUserMedia({
-        video: { width: 1280, height: 720, frameRate: 30, facingMode: 'user' },
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      this.localStream = stream;
+      // Initialize enterprise media system
+      await this.initializeEnterpriseMedia();
 
       // Setup real-time signaling using enterprise SignalingManager
       await this.signalingManager.connect(roomId, userId);
@@ -273,7 +268,8 @@ export class VideoConferenceSDK extends EventEmitter {
    */
   private async handleWebRTCAnswer(fromUserId: string, answer: RTCSessionDescriptionInit): Promise<void> {
     try {
-      const peerConnection = this.peerConnectionManager.getPeerConnection(fromUserId);
+      const peerConnections = this.peerConnectionManager.getPeerConnections();
+      const peerConnection = peerConnections.get(fromUserId);
       if (peerConnection) {
         await peerConnection.setRemoteDescription(answer);
       }
@@ -287,7 +283,8 @@ export class VideoConferenceSDK extends EventEmitter {
    */
   private async handleWebRTCIceCandidate(fromUserId: string, candidate: RTCIceCandidateInit): Promise<void> {
     try {
-      const peerConnection = this.peerConnectionManager.getPeerConnection(fromUserId);
+      const peerConnections = this.peerConnectionManager.getPeerConnections();
+      const peerConnection = peerConnections.get(fromUserId);
       if (peerConnection) {
         await peerConnection.addIceCandidate(candidate);
       }
@@ -297,56 +294,34 @@ export class VideoConferenceSDK extends EventEmitter {
   }
 
   /**
-   * Initialize local camera and microphone with proper error handling (Legacy method)
+   * Initialize local media using enterprise MediaManager
    */
-  private async initializeLocalMedia(): Promise<void> {
+  private async initializeEnterpriseMedia(): Promise<void> {
     try {
-      console.log('🎥 Initializing local media (camera & microphone)...');
+      console.log('🎥 Initializing enterprise media system...');
       
-      // Check if media devices are available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Media devices not supported in this browser');
-      }
-
-      // Request media stream with optimal settings
-      const constraints = {
-        video: {
-          width: { min: 320, ideal: 640, max: 1280 },
-          height: { min: 240, ideal: 480, max: 720 },
-          frameRate: { ideal: 15, max: 30 },
-          facingMode: 'user'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000
-        }
-      };
-
-      console.log('🔊 Requesting media with constraints:', constraints);
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
+      // Initialize MediaManager
+      await this.mediaManager.initialize();
+      
+      // Get user media with enterprise settings
+      const stream = await this.mediaManager.getUserMedia({
+        video: { width: 1280, height: 720, frameRate: 30, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      
+      this.localStream = stream;
+      
       // Verify stream tracks
       const videoTracks = stream.getVideoTracks();
       const audioTracks = stream.getAudioTracks();
       
-      console.log(`📊 Stream tracks - Video: ${videoTracks.length}, Audio: ${audioTracks.length}`);
-      
-      if (videoTracks.length === 0 && audioTracks.length === 0) {
-        throw new Error('No media tracks available');
-      }
-
-      this.localStream = stream;
       this.isVideoEnabled = videoTracks.length > 0 && videoTracks[0].enabled;
       this.isAudioEnabled = audioTracks.length > 0 && audioTracks[0].enabled;
       
-      console.log(`✅ Media initialized - Video: ${this.isVideoEnabled}, Audio: ${this.isAudioEnabled}`);
+      console.log(`✅ Enterprise media initialized - Video: ${this.isVideoEnabled}, Audio: ${this.isAudioEnabled}`);
       
-      // Set up track event listeners
+      // Set up track event listeners for proper cleanup
       stream.getTracks().forEach(track => {
-        console.log(`🎬 Track details: ${track.kind} - enabled: ${track.enabled}, readyState: ${track.readyState}`);
-        
         track.addEventListener('ended', () => {
           console.log(`📡 Track ended: ${track.kind}`);
           if (track.kind === 'video') {
@@ -359,13 +334,13 @@ export class VideoConferenceSDK extends EventEmitter {
         });
       });
       
-      // Emit local stream for UI
-      this.emit('local-stream', { stream, type: 'camera' });
+      // Emit local stream for UI with enterprise labeling
+      this.emit('local-stream', { stream, type: 'camera', enterprise: true });
       
-      console.log('✅ Local media setup complete');
+      console.log('✅ Enterprise media system ready');
       
     } catch (error) {
-      console.error('❌ Failed to get user media:', error);
+      console.error('❌ Enterprise media initialization failed:', error);
       
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
@@ -444,13 +419,13 @@ export class VideoConferenceSDK extends EventEmitter {
           }
         })
         .on('broadcast', { event: 'webrtc-offer' }, (payload) => {
-          this.handleWebRTCOffer(payload.payload);
+          this.handleWebRTCOffer(payload.payload.fromUserId, payload.payload.offer);
         })
         .on('broadcast', { event: 'webrtc-answer' }, (payload) => {
-          this.handleWebRTCAnswer(payload.payload);
+          this.handleWebRTCAnswer(payload.payload.fromUserId, payload.payload.answer);
         })
         .on('broadcast', { event: 'webrtc-ice-candidate' }, (payload) => {
-          this.handleWebRTCIceCandidate(payload.payload);
+          this.handleWebRTCIceCandidate(payload.payload.fromUserId, payload.payload.candidate);
         })
         .on('broadcast', { event: 'media-toggle' }, (payload) => {
           this.handleMediaToggle(payload.payload);
