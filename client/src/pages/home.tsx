@@ -21,7 +21,6 @@ import Footer from "@/components/Footer";
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfile, getLiveClasses } from "@/lib/api";
 import { Link } from "wouter";
-import { insertSampleData } from "../utils/insertSampleData";
 
 export default function Home() {
   const { toast } = useToast();
@@ -53,24 +52,7 @@ export default function Home() {
 
   const displayUser = user;
 
-  // Insert sample data when button is clicked (for testing)
-  const handleInsertSampleData = async () => {
-    const result = await insertSampleData();
-    if (result.success) {
-      toast({
-        title: "নমুনা ডেটা যোগ করা হয়েছে!",
-        description: "কোর্স, ইন্সট্রাক্টর এবং ক্লাসের তথ্য যোগ করা হয়েছে।",
-      });
-      // Refetch data
-      window.location.reload();
-    } else {
-      toast({
-        title: "ত্রুটি!",
-        description: "ডেটা যোগ করতে সমস্যা হয়েছে।",
-        variant: "destructive",
-      });
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,7 +70,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  আসসালামু আলাইকুম, {displayProfile.first_name || displayUser.user_metadata?.first_name || "ভাই/বোন"}!
+                  আসসালামু আলাইকুম, {displayProfile.first_name || displayUser?.user_metadata?.first_name || "ভাই/বোন"}!
                 </h1>
                 <p className="opacity-90">আপনার আরবি শিক্ষার যাত্রায় স্বাগতম</p>
               </div>
@@ -169,7 +151,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-              ) : upcomingClasses.length > 0 ? (
+              ) : upcomingClasses && upcomingClasses.length > 0 ? (
                 <div className="space-y-4">
                   {upcomingClasses.slice(0, 3).map((classItem: any) => (
                     <div key={classItem.id} className="flex items-center justify-between p-4 bg-soft-mint rounded-lg">

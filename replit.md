@@ -1,6 +1,12 @@
 # Overview
 
-This project is an Arabic language learning platform with live online classes, designed for Bengali speakers to learn Arabic for Quran and Hadith understanding. It supports course enrollment, payment processing, live class participation, progress tracking, and certificate generation. The platform features an enterprise-grade video SDK comparable to leading platforms and a robust authentication system, built on a pure Supabase backend.
+This project is an Arabic language learning platform with live online classes, designed for Bengali speakers to learn Arabic for Quran and Hadith understanding. It supports course enrollment, payment processing, live class participation, progress tracking, and certificate generation. The platform features a single, focused live class system with enterprise-grade video SDK comparable to leading platforms and a robust authentication system, built on a pure Supabase backend.
+
+## Recent Changes (Aug 21, 2025)
+- Simplified video conferencing system to use only the recommended `/live-class` page
+- Removed redundant video conferencing pages: `/live-classes`, `/video-meet`, `/enterprise-meet`, `/video-rooms`
+- Updated navigation to focus on the main live class functionality
+- Streamlined user experience with a single video conferencing solution
 
 # User Preferences
 
