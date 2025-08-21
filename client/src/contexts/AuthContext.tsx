@@ -539,18 +539,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('⏰ Emergency timeout - forcing auth completion');
         setState(prev => ({ ...prev, loading: false }));
       }
-    }, 3000);
+    }, 30000); // Increased from 3s to 30s
     
     // Get initial session with improved SPA handling
     const initializeAuth = async () => {
       try {
-        // First try to get session with a timeout - increased to 5 seconds
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 5000)
-        );
-        
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+        // Get session without artificial timeout - let Supabase handle it naturally
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
         
