@@ -17,7 +17,11 @@ import {
   Play,
   Download,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Edit,
+  Settings,
+  Shield
 } from "lucide-react";
 import Header from "@/components/Header";
 
@@ -205,6 +209,81 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Admin Controls - Only visible for admin users */}
+        {displayProfile.role === 'admin' && (
+          <div className="mb-8">
+            <Card className="bg-gradient-to-r from-islamic-green to-emerald-600 text-white border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5" />
+                  <span>অ্যাডমিন প্যানেল - ক্লাস ম্যানেজমেন্ট</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button
+                    size="lg"
+                    className="bg-white text-islamic-green hover:bg-gray-100 h-14"
+                    onClick={() => {
+                      toast({
+                        title: "নতুন ক্লাস তৈরি",
+                        description: "নতুন ক্লাস তৈরির ফর্ম খুলছে...",
+                      });
+                      // Add navigation to create class form
+                    }}
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    নতুন ক্লাস তৈরি করুন
+                  </Button>
+                  
+                  <Button
+                    size="lg"
+                    className="bg-white text-islamic-green hover:bg-gray-100 h-14"
+                    onClick={() => {
+                      toast({
+                        title: "ক্লাস ম্যানেজমেন্ট",
+                        description: "সকল ক্লাসের তালিকা দেখানো হচ্ছে...",
+                      });
+                      // Add navigation to manage classes
+                    }}
+                  >
+                    <Settings className="h-5 w-5 mr-2" />
+                    সকল ক্লাস ম্যানেজ করুন
+                  </Button>
+                  
+                  <Button
+                    size="lg"
+                    className="bg-white text-islamic-green hover:bg-gray-100 h-14"
+                    onClick={() => {
+                      toast({
+                        title: "ক্লাস এডিট",
+                        description: "ক্লাস সম্পাদনা পেজে যাচ্ছেন...",
+                      });
+                      // Add navigation to edit classes
+                    }}
+                  >
+                    <Edit className="h-5 w-5 mr-2" />
+                    ক্লাস সম্পাদনা করুন
+                  </Button>
+                </div>
+                
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="bg-white/10 rounded-lg p-3">
+                    <h4 className="font-medium mb-1">দ্রুত তথ্য</h4>
+                    <p className="text-white/80">মোট ক্লাস: {upcomingClassesList.length}</p>
+                    <p className="text-white/80">সক্রিয় শিক্ষার্থী: {attendance?.length || 0}</p>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-3">
+                    <h4 className="font-medium mb-1">অ্যাডমিন সুবিধা</h4>
+                    <p className="text-white/80">• ক্লাস তৈরি ও সম্পাদনা</p>
+                    <p className="text-white/80">• শিক্ষার্থী ম্যানেজমেন্ট</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">

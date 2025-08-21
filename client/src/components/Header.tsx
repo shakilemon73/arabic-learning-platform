@@ -75,8 +75,8 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      {profile?.avatar_url && (
-                        <AvatarImage src={profile.avatar_url} alt={fullName} />
+                      {profile?.profile_image_url && (
+                        <AvatarImage src={profile.profile_image_url} alt={fullName} />
                       )}
                       <AvatarFallback className="bg-islamic-green text-white">
                         {displayName.charAt(0).toUpperCase()}
