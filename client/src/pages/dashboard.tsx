@@ -29,7 +29,8 @@ import CreateClassForm from "@/components/admin/CreateClassForm";
 import ManageClassesPanel from "@/components/admin/ManageClassesPanel";
 
 import { useQuery } from "@tanstack/react-query";
-import { getUserProfile, getUserAttendance, getLiveClasses } from "@/lib/api";
+import { getUserProfile, getUserAttendance } from "@/lib/api";
+import { getLiveClasses } from "@/lib/supabase";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -71,7 +72,20 @@ export default function Dashboard() {
 
   const { data: upcomingClasses, isLoading: classesLoading, error: classesError } = useQuery({
     queryKey: ['live-classes'],
-    queryFn: async () => await getLiveClasses(),
+    queryFn: async () => {
+      console.log('🔍 Dashboard: Calling getLiveClasses()...');
+      const result = await getLiveClasses();
+      console.log('🔍 Dashboard: getLiveClasses result:', result);
+      
+      if (result && result.error) {
+        console.error('❌ Dashboard: Error fetching live classes:', result.error);
+        throw result.error;
+      }
+      
+      const classes = result && result.data ? result.data : (Array.isArray(result) ? result : []);
+      console.log('🔍 Dashboard: Final classes array:', classes);
+      return classes;
+    },
     initialData: [],
     staleTime: 1000 * 60 * 5, // 5 minutes for better caching
     refetchOnWindowFocus: false, // Disable to prevent constant refetching
