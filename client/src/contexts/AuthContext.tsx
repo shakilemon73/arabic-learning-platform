@@ -11,7 +11,7 @@ interface UserProfile {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
-  avatar_url: string | null;
+  profile_image_url: string | null;
   enrollment_status: 'pending' | 'active' | 'suspended' | 'completed';
   payment_status: 'pending' | 'paid' | 'overdue' | 'refunded';
   course_progress: number;
@@ -78,14 +78,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🔍 Fetching user profile for:', userId);
       
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - increased to 10 seconds
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
       );
       
       const fetchPromise = supabase
         .from('users')
-        .select('*')
+        .select('id, email, first_name, last_name, phone, profile_image_url, enrollment_status, payment_status, course_progress, classes_attended, certificate_score, role, created_at, updated_at')
         .eq('id', userId)
         .single();
 
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         first_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'User',
         last_name: user.user_metadata?.last_name || '',
         phone: user.phone || null,
-        avatar_url: user.user_metadata?.avatar_url || null,
+        profile_image_url: user.user_metadata?.avatar_url || null,
         enrollment_status: 'pending' as const,
         payment_status: 'pending' as const,
         course_progress: 0,
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         first_name: user.user_metadata?.first_name || null,
         last_name: user.user_metadata?.last_name || null,
         phone: user.phone || null,
-        avatar_url: user.user_metadata?.avatar_url || null,
+        profile_image_url: user.user_metadata?.avatar_url || null,
         enrollment_status: 'pending' as const,
         payment_status: 'pending' as const,
         course_progress: 0,
@@ -541,10 +541,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session with improved SPA handling
     const initializeAuth = async () => {
       try {
-        // First try to get session with a timeout
+        // First try to get session with a timeout - increased to 5 seconds
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 2000)
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
         );
         
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
