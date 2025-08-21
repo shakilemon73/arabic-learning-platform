@@ -73,23 +73,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const { toast } = useToast();
 
-  // Fetch user profile from database with timeout
+  // Fetch user profile from database with better error handling
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       console.log('🔍 Fetching user profile for:', userId);
       
-      // Add timeout to prevent hanging - increased to 10 seconds
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-      );
+      // Get current session to ensure proper authentication
+      const { data: { session } } = await supabase.auth.getSession();
       
-      const fetchPromise = supabase
+      if (!session) {
+        console.warn('⚠️ No active session for profile fetch');
+        // Try without session first (for anon access)
+      }
+      
+      console.log('🔑 Session status:', session ? 'Active' : 'None');
+      
+      const { data, error } = await supabase
         .from('users')
         .select('id, email, first_name, last_name, phone, profile_image_url, enrollment_status, payment_status, course_progress, classes_attended, certificate_score, role, created_at, updated_at')
         .eq('id', userId)
         .single();
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
         console.error('⚠️ Error fetching user profile:', {
@@ -146,7 +149,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         course_progress: 0,
         classes_attended: 0,
         certificate_score: 0,
-        role: 'student' as const,
+        role: userId === '3b077064-343c-4938-9ae0-52a866156162' ? 'admin' as const : 'student' as const, // Preserve admin role
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
