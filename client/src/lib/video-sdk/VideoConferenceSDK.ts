@@ -137,40 +137,100 @@ export class VideoConferenceSDK {
   }
 
   /**
-   * Initialize local camera and microphone
+   * Initialize local camera and microphone with proper error handling
    */
   private async initializeLocalMedia(): Promise<void> {
     try {
       console.log('🎥 Initializing local media (camera & microphone)...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Check if media devices are available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not supported in this browser');
+      }
+
+      // Request media stream with optimal settings
+      const constraints = {
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
+          width: { min: 320, ideal: 640, max: 1280 },
+          height: { min: 240, ideal: 480, max: 720 },
+          frameRate: { ideal: 15, max: 30 },
+          facingMode: 'user'
         },
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 48000
         }
-      });
+      };
+
+      console.log('🔊 Requesting media with constraints:', constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      // Verify stream tracks
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      
+      console.log(`📊 Stream tracks - Video: ${videoTracks.length}, Audio: ${audioTracks.length}`);
+      
+      if (videoTracks.length === 0 && audioTracks.length === 0) {
+        throw new Error('No media tracks available');
+      }
 
       this.localStream = stream;
+      this.isVideoEnabled = videoTracks.length > 0 && videoTracks[0].enabled;
+      this.isAudioEnabled = audioTracks.length > 0 && audioTracks[0].enabled;
+      
+      console.log(`✅ Media initialized - Video: ${this.isVideoEnabled}, Audio: ${this.isAudioEnabled}`);
+      
+      // Set up track event listeners
+      stream.getTracks().forEach(track => {
+        console.log(`🎬 Track details: ${track.kind} - enabled: ${track.enabled}, readyState: ${track.readyState}`);
+        
+        track.addEventListener('ended', () => {
+          console.log(`📡 Track ended: ${track.kind}`);
+          if (track.kind === 'video') {
+            this.isVideoEnabled = false;
+            this.emit('video-toggled', { enabled: false });
+          } else if (track.kind === 'audio') {
+            this.isAudioEnabled = false;
+            this.emit('audio-toggled', { enabled: false });
+          }
+        });
+      });
+      
+      // Emit local stream for UI
       this.emit('local-stream', { stream, type: 'camera' });
       
-      console.log('✅ Local media initialized successfully');
+      console.log('✅ Local media setup complete');
       
     } catch (error) {
       console.error('❌ Failed to get user media:', error);
       
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
-          throw new Error('Camera/microphone access denied. Please allow permissions and refresh.');
+          throw new Error('Camera/microphone access denied. Please allow permissions and refresh the page.');
         } else if (error.name === 'NotFoundError') {
-          throw new Error('No camera or microphone found. Please connect devices.');
+          throw new Error('No camera or microphone found. Please connect devices and try again.');
         } else if (error.name === 'NotReadableError') {
-          throw new Error('Camera or microphone is already in use.');
+          throw new Error('Camera or microphone is already in use by another application.');
+        } else if (error.name === 'OverconstrainedError') {
+          console.log('🔄 Trying with fallback constraints...');
+          // Try with simpler constraints
+          try {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: true
+            });
+            this.localStream = fallbackStream;
+            this.isVideoEnabled = fallbackStream.getVideoTracks().length > 0;
+            this.isAudioEnabled = fallbackStream.getAudioTracks().length > 0;
+            this.emit('local-stream', { stream: fallbackStream, type: 'camera' });
+            console.log('✅ Fallback media initialized');
+            return;
+          } catch (fallbackError) {
+            throw new Error('Media constraints not supported. Please try a different browser.');
+          }
         }
       }
       throw error;
@@ -358,11 +418,21 @@ export class VideoConferenceSDK {
       ]
     });
 
-    // Add local stream tracks
-    if (this.localStream) {
+    // Add local stream tracks with detailed logging
+    if (this.localStream && this.localStream.getTracks().length > 0) {
+      console.log(`📤 Adding ${this.localStream.getTracks().length} local tracks to peer connection with ${participantId}`);
+      
       this.localStream.getTracks().forEach(track => {
-        pc.addTrack(track, this.localStream!);
+        console.log(`📡 Adding ${track.kind} track - enabled: ${track.enabled}, readyState: ${track.readyState}`);
+        try {
+          pc.addTrack(track, this.localStream!);
+          console.log(`✅ ${track.kind} track added successfully`);
+        } catch (error) {
+          console.error(`❌ Failed to add ${track.kind} track:`, error);
+        }
       });
+    } else {
+      console.warn('⚠️ No local stream available when creating peer connection');
     }
 
     // Add screen share stream if active

@@ -92,26 +92,49 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
         });
 
         videoSDK.on('local-stream', (data: any) => {
-          console.log('📺 Local stream received');
+          console.log('📺 Local stream received:', {
+            type: data.type,
+            videoTracks: data.stream.getVideoTracks().length,
+            audioTracks: data.stream.getAudioTracks().length
+          });
           setLocalStream(data.stream);
-          if (localVideoRef.current) {
+          
+          // Ensure local video element gets the stream and auto-plays
+          if (localVideoRef.current && localVideoRef.current.srcObject !== data.stream) {
             localVideoRef.current.srcObject = data.stream;
+            localVideoRef.current.muted = true; // Prevent audio feedback
+            localVideoRef.current.autoplay = true;
+            localVideoRef.current.playsInline = true;
+            localVideoRef.current.play().catch(error => {
+              console.log('Auto-play prevented for local video:', error);
+            });
           }
         });
 
         videoSDK.on('remote-stream', (data: any) => {
-          console.log('📺 Remote stream received:', data.participantId);
+          console.log('📺 Remote stream received from:', data.participantId, {
+            videoTracks: data.stream.getVideoTracks().length,
+            audioTracks: data.stream.getAudioTracks().length
+          });
+          
           setRemoteStreams(prev => {
             const newStreams = new Map(prev);
             newStreams.set(data.participantId, data.stream);
             return newStreams;
           });
           
-          // Connect to video element
-          const videoElement = participantVideoRefs.current.get(data.participantId);
-          if (videoElement) {
-            videoElement.srcObject = data.stream;
-          }
+          // Auto-connect to video element with improved handling
+          setTimeout(() => {
+            const videoElement = participantVideoRefs.current.get(data.participantId);
+            if (videoElement && videoElement.srcObject !== data.stream) {
+              videoElement.srcObject = data.stream;
+              videoElement.autoplay = true;
+              videoElement.playsInline = true;
+              videoElement.play().catch(error => {
+                console.log(`Auto-play prevented for remote video ${data.participantId}:`, error);
+              });
+            }
+          }, 100);
         });
 
         videoSDK.on('participant-joined', (data: any) => {
