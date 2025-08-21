@@ -54,6 +54,7 @@ export default function EnterpriseRealMeetPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [connectionState, setConnectionState] = useState<string>('disconnected');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('participant');
   
   // Video refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -119,12 +120,23 @@ export default function EnterpriseRealMeetPage() {
       client.onConnectionChange((state) => {
         setConnectionState(state);
         setIsConnected(state === 'connected');
+        
+        // Update role when connected
+        if (state === 'connected' && webrtcClient.current) {
+          setCurrentUserRole(webrtcClient.current.getCurrentRole());
+        }
       });
 
       // Initialize and connect
       await client.initialize(user.id, displayName);
       await client.connectSignaling();
-      await client.joinRoom(roomId, 'participant');
+      
+      // Determine role: first person to join becomes host, others are participants
+      const isHost = !participants.length && !isConnected;
+      const role = isHost ? 'host' : 'participant';
+      console.log('🎯 Joining room as:', role, 'User:', displayName);
+      
+      await client.joinRoom(roomId, role);
 
       setIsConnecting(false);
       console.log('✅ WebRTC connection established');
@@ -204,6 +216,9 @@ export default function EnterpriseRealMeetPage() {
           <div className="flex items-center gap-2">
             <Badge variant={isConnected ? "default" : "destructive"}>
               {isConnecting ? 'Connecting...' : connectionState}
+            </Badge>
+            <Badge variant={currentUserRole === 'host' ? "destructive" : "secondary"}>
+              {currentUserRole === 'host' ? '👑 Host' : '👤 Participant'}
             </Badge>
             <span className="text-sm text-slate-400">Room: {roomId}</span>
             <Button

@@ -94,8 +94,11 @@ wss.on('connection', (ws, req) => {
           
           // Get existing participants before adding new one
           const existingParticipants = [];
+          let isFirstInRoom = true;
+          
           if (rooms.has(currentRoomId)) {
             const room = rooms.get(currentRoomId);
+            isFirstInRoom = room.size === 0;
             room.forEach((participant, id) => {
               existingParticipants.push({
                 id,
@@ -107,8 +110,14 @@ wss.on('connection', (ws, req) => {
             });
           }
           
+          // Determine role: if no one else in room, become host
+          const actualRole = isFirstInRoom ? 'host' : message.data.role || 'participant';
+          const participantData = { ...message.data, role: actualRole };
+          
+          console.log(`🎯 User ${message.data.name} joining as: ${actualRole} (first in room: ${isFirstInRoom})`);
+          
           // Add participant to room
-          addParticipantToRoom(currentRoomId, currentParticipantId, ws, message.data);
+          addParticipantToRoom(currentRoomId, currentParticipantId, ws, participantData);
           
           // Send join confirmation to new participant
           ws.send(JSON.stringify({
@@ -116,7 +125,9 @@ wss.on('connection', (ws, req) => {
             roomId: currentRoomId,
             participantId: currentParticipantId,
             data: {
-              participants: existingParticipants
+              participants: existingParticipants,
+              yourRole: actualRole,
+              isHost: actualRole === 'host'
             }
           }));
           
@@ -127,10 +138,10 @@ wss.on('connection', (ws, req) => {
             data: {
               participant: {
                 id: currentParticipantId,
-                name: message.data.name,
-                role: message.data.role,
-                videoEnabled: message.data.videoEnabled,
-                audioEnabled: message.data.audioEnabled
+                name: participantData.name,
+                role: actualRole,
+                videoEnabled: participantData.videoEnabled,
+                audioEnabled: participantData.audioEnabled
               }
             }
           }, currentParticipantId);

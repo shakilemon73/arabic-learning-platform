@@ -36,6 +36,7 @@ export class WebRTCClient {
   private participantId: string = '';
   private participantName: string = '';
   private isConnected: boolean = false;
+  private currentRole: string = 'participant';
 
   // Event handlers
   private onParticipantJoined?: (participant: Participant) => void;
@@ -178,7 +179,14 @@ export class WebRTCClient {
     switch (message.type) {
       case 'joined-room':
         console.log('✅ Successfully joined room:', message.roomId);
+        console.log('🎯 Your role:', message.data?.yourRole);
         console.log('👥 Existing participants:', message.data?.participants);
+        
+        // Store role information
+        if (message.data?.yourRole) {
+          this.currentRole = message.data.yourRole;
+        }
+        
         // Create peer connections to existing participants
         if (message.data?.participants) {
           for (const participant of message.data.participants) {
@@ -445,6 +453,23 @@ export class WebRTCClient {
 
   getAllRemoteStreams(): Map<string, MediaStream> {
     return new Map(this.remoteStreams);
+  }
+
+  // Role management
+  getCurrentRole(): string {
+    return this.currentRole;
+  }
+
+  isHost(): boolean {
+    return this.currentRole === 'host';
+  }
+
+  getParticipantId(): string {
+    return this.participantId;
+  }
+
+  getRoomId(): string {
+    return this.roomId;
   }
 
   // Cleanup
