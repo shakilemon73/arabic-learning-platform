@@ -52,8 +52,8 @@ export default function Dashboard() {
     enabled: !!user?.id,
     initialData: null,
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: true,
-    retry: 2,
+    refetchOnWindowFocus: false, // Disable to prevent constant refetching
+    retry: 1,
   });
 
   const { data: attendance, isLoading: attendanceLoading, error: attendanceError } = useQuery({
@@ -65,17 +65,18 @@ export default function Dashboard() {
     enabled: !!user?.id,
     initialData: [],
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: true,
-    retry: 2,
+    refetchOnWindowFocus: false, // Disable to prevent constant refetching
+    retry: 1,
   });
 
   const { data: upcomingClasses, isLoading: classesLoading, error: classesError } = useQuery({
     queryKey: ['live-classes'],
     queryFn: async () => await getLiveClasses(),
     initialData: [],
-    staleTime: 1000 * 60 * 2, // 2 minutes for live data
-    refetchOnWindowFocus: true,
-    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes for better caching
+    refetchOnWindowFocus: false, // Disable to prevent constant refetching
+    retry: 1, // Reduce retries to prevent hanging
+    refetchInterval: false, // Disable automatic refetching
   });
   
   // Debug: Show what classes are loaded from your Supabase

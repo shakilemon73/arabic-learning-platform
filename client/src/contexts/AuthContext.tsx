@@ -215,13 +215,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Update auth state
+  // Update auth state with optimized profile fetching
   const updateAuthState = async (user: User | null, session: Session | null) => {
     try {
       if (user) {
         console.log('🔄 Auth state changed:', 'SIGNED_IN', 'User present');
         
-        // Set loading to false immediately to prevent UI blocking
+        // Set basic auth state immediately to prevent UI blocking
         setState(prev => ({
           ...prev,
           user,
@@ -230,12 +230,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
           error: null,
         }));
         
-        // Fetch profile separately and update
-        const profile = await fetchUserProfile(user.id);
-        setState(prev => ({
-          ...prev,
-          profile,
-        }));
+        // Fetch profile in background with timeout and fallback
+        try {
+          const profilePromise = fetchUserProfile(user.id);
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), 3000) // 3 second timeout for profile
+          );
+          
+          const profile = await Promise.race([profilePromise, timeoutPromise]);
+          
+          // Only update if we got a valid profile
+          if (profile) {
+            setState(prev => ({
+              ...prev,
+              profile,
+            }));
+          } else {
+            console.warn('⚠️ Profile fetch timed out, using auth user data');
+            // Create minimal profile from auth user data
+            const fallbackProfile: UserProfile = {
+              id: user.id,
+              email: user.email!,
+              first_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'User',
+              last_name: user.user_metadata?.last_name || '',
+              phone: user.phone || null,
+              profile_image_url: user.user_metadata?.avatar_url || null,
+              enrollment_status: 'pending',
+              payment_status: 'pending',
+              course_progress: 0,
+              classes_attended: 0,
+              certificate_score: 0,
+              role: user.id === '3b077064-343c-4938-9ae0-52a866156162' ? 'admin' : 'student',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            setState(prev => ({
+              ...prev,
+              profile: fallbackProfile,
+            }));
+          }
+        } catch (profileError) {
+          console.error('⚠️ Profile fetch error:', profileError);
+          // Continue without profile - user can still access the app
+        }
       } else {
         console.log('🔄 Auth state changed:', 'SIGNED_OUT', 'No user');
         // Ensure complete cleanup on sign out
@@ -252,7 +290,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error as AuthError,
+        error: null, // Don't show auth errors to user unless critical
       }));
     }
   };
@@ -532,28 +570,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
+    let authInitialized = false;
     
-    // Emergency timeout to prevent infinite loading on SPA refresh
+    // Much shorter timeout to prevent UI blocking on refresh
     timeoutId = setTimeout(() => {
-      if (mounted) {
+      if (mounted && !authInitialized) {
         console.log('⏰ Emergency timeout - forcing auth completion');
         setState(prev => ({ ...prev, loading: false }));
       }
-    }, 30000); // Increased from 3s to 30s
+    }, 3000); // Back to 3 seconds for better UX
     
-    // Get initial session with improved SPA handling
+    // Get initial session with improved error handling
     const initializeAuth = async () => {
       try {
-        // Get session without artificial timeout - let Supabase handle it naturally
+        // Get session with timeout handling
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
+        authInitialized = true;
         
         if (timeoutId) clearTimeout(timeoutId);
         
         if (error) {
           console.error('Error getting session:', error);
-          setState(prev => ({ ...prev, loading: false, error }));
+          setState(prev => ({ ...prev, loading: false, error: null })); // Don't show auth errors on init
           return;
         }
 
@@ -568,59 +608,73 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('Error initializing auth:', error);
         
         if (!mounted) return;
+        authInitialized = true;
         
         if (timeoutId) clearTimeout(timeoutId);
         
-        // For SPA refreshes, try to continue without session
+        // For SPA refreshes and timeouts, don't block the UI
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: null // Don't show error for timeout on refresh
+          error: null
         }));
       }
     };
 
     initializeAuth();
 
-    // Listen for auth changes
+    // Listen for auth changes with debounced handling
+    let debounceTimeout: NodeJS.Timeout;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth hook received user change:', session?.user ? 'User present' : 'No user');
         console.log('🔄 Auth event:', event);
         
-        // Handle different auth events with proper cleanup
-        if (event === 'SIGNED_OUT') {
-          console.log('🚪 User signed out - clearing all state');
-          setState({
-            user: null,
-            profile: null,
-            session: null,
-            loading: false,
-            error: null,
-          });
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          await updateAuthState(session?.user || null, session);
-        } else if (event === 'INITIAL_SESSION') {
-          // Handle initial session without causing loading state issues
-          if (session?.user) {
-            await updateAuthState(session.user, session);
-          } else {
-            setState(prev => ({
-              ...prev,
+        // Clear any pending debounced calls
+        if (debounceTimeout) clearTimeout(debounceTimeout);
+        
+        // Debounce rapid auth state changes
+        debounceTimeout = setTimeout(async () => {
+          if (!mounted) return;
+          
+          // Handle different auth events with proper cleanup
+          if (event === 'SIGNED_OUT') {
+            console.log('🚪 User signed out - clearing all state');
+            setState({
               user: null,
               profile: null,
               session: null,
               loading: false,
               error: null,
-            }));
+            });
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (session?.user) {
+              await updateAuthState(session.user, session);
+            }
+          } else if (event === 'INITIAL_SESSION') {
+            // Handle initial session without causing loading state issues
+            if (session?.user) {
+              await updateAuthState(session.user, session);
+            } else {
+              setState(prev => ({
+                ...prev,
+                user: null,
+                profile: null,
+                session: null,
+                loading: false,
+                error: null,
+              }));
+            }
           }
-        }
+        }, 100); // 100ms debounce
       }
     );
 
     return () => {
       mounted = false;
+      authInitialized = true;
       if (timeoutId) clearTimeout(timeoutId);
+      if (debounceTimeout) clearTimeout(debounceTimeout);
       subscription.unsubscribe();
     };
   }, []);

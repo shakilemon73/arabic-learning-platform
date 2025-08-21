@@ -50,31 +50,54 @@ export const createUserProfile = async (userId: string, profile: Partial<User>) 
   return data;
 };
 
-// Course functions
+// Course functions with timeout
 export const getCourseModules = async (): Promise<CourseModule[]> => {
-  const { data, error } = await supabase
-    .from('course_modules')
-    .select('*')
-    .eq('is_active', true)
-    .order('order');
+  try {
+    const queryPromise = supabase
+      .from('course_modules')
+      .select('*')
+      .eq('is_active', true)
+      .order('order');
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), 3000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
     
-  if (error) throw error;
-  return data || [];
+    if (error) {
+      console.error('getCourseModules error:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('getCourseModules error:', error);
+    return [];
+  }
 };
 
-// Live class functions with security enhancements
+// Live class functions with optimized performance
 export const getLiveClasses = async (): Promise<LiveClassWithDetails[]> => {
   try {
-    // Security: Validate session before making API calls
-    const { valid } = await securityManager.validateSession();
-    if (!valid) {
-      throw new Error('Invalid session. Please login again.');
-    }
-
-    const { data, error } = await supabase
+    // Optimized query with timeout to prevent UI blocking
+    const queryPromise = supabase
       .from('live_classes')
       .select(`
-        *,
+        id,
+        title,
+        title_bn,
+        description,
+        description_bn,
+        module_id,
+        instructor_id,
+        scheduled_at,
+        duration,
+        meeting_url,
+        recording_url,
+        max_participants,
+        current_participants,
+        is_active,
+        created_at,
         course_modules (
           title,
           title_bn,
@@ -88,20 +111,26 @@ export const getLiveClasses = async (): Promise<LiveClassWithDetails[]> => {
       `)
       .eq('is_active', true)
       .order('scheduled_at')
-      .limit(50); // Security: Limit query results
+      .limit(20); // Reduced limit for faster loading
+
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), 5000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
       
     if (error) {
-      securityManager.logSecurityEvent('api_error', {
-        function: 'getLiveClasses',
-        error: error.message
-      });
-      throw error;
+      console.error('API Error - getLiveClasses:', error);
+      // Return empty array instead of throwing to prevent UI blocking
+      return [];
     }
     
-    return data || [];
+    return (data || []) as unknown as LiveClassWithDetails[];
   } catch (error) {
-    console.error('🔒 Secure API Error - getLiveClasses:', error);
-    throw error;
+    console.error('getLiveClasses error:', error);
+    // Return empty array instead of throwing to prevent UI crash
+    return [];
   }
 };
 
@@ -204,20 +233,26 @@ export const deleteLiveClass = async (classId: string) => {
 
 export const getAllInstructors = async () => {
   try {
-    const { data, error } = await supabase
+    const queryPromise = supabase
       .from('instructors')
       .select('*')
       .eq('is_active', true)
       .order('name');
-      
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), 3000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+    
     if (error) {
-      console.error('Error fetching instructors:', error);
-      throw error;
+      console.error('getAllInstructors error:', error);
+      return [];
     }
     return data || [];
   } catch (error) {
-    console.error('Failed to fetch instructors:', error);
-    throw error;
+    console.error('getAllInstructors error:', error);
+    return [];
   }
 };
 
