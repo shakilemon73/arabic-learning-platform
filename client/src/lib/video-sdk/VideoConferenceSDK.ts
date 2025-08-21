@@ -52,6 +52,7 @@ export class VideoConferenceSDK {
   private isVideoEnabled = true;
   private isAudioEnabled = true;
   private isScreenSharing = false;
+  private userRole: 'host' | 'moderator' | 'participant' = 'participant';
   
   // Event listeners
   private eventListeners = new Map<string, Function[]>();
@@ -102,25 +103,29 @@ export class VideoConferenceSDK {
   async joinRoom(roomId: string, userId: string, displayName: string, role: 'host' | 'moderator' | 'participant' = 'participant'): Promise<void> {
     try {
       console.log(`🎯 Joining conference room: ${roomId}`);
-      console.log(`👤 DEBUG: VideoSDK.joinRoom() - userId: "${userId}", displayName: "${displayName}"`);
+      console.log(`👤 DEBUG: VideoSDK.joinRoom() - userId: "${userId}", displayName: "${displayName}", role: "${role}"`);
       
       this.roomId = roomId;
       this.userId = userId;
       this.displayName = displayName;
+      this.userRole = role;
       
-      console.log(`💾 DEBUG: Stored in VideoSDK - this.userId: "${this.userId}", this.displayName: "${this.displayName}"`);
+      console.log(`💾 DEBUG: Stored in VideoSDK - this.userId: "${this.userId}", this.displayName: "${this.displayName}", role: "${this.userRole}"`);
+
+      // Check if room exists, create if doesn't exist and user is admin
+      await this.ensureRoomExists(role);
 
       // Initialize local media
       await this.initializeLocalMedia();
 
       // Setup real-time signaling
-      await this.setupSignaling();
+      await this.setupSignaling(role);
 
       // Add participant to database
       await this.addParticipantToDatabase(role);
 
       this.isConnected = true;
-      this.emit('connected', { roomId, userId });
+      this.emit('connected', { roomId, userId, role });
       
       console.log('✅ Successfully joined conference room');
       
@@ -175,7 +180,7 @@ export class VideoConferenceSDK {
   /**
    * Setup real-time signaling with Supabase
    */
-  private async setupSignaling(): Promise<void> {
+  private async setupSignaling(role: string): Promise<void> {
     if (!this.roomId || !this.userId) return;
 
     try {
@@ -187,10 +192,14 @@ export class VideoConferenceSDK {
           console.log('🔄 Presence sync - getting all participants');
           const presenceState = channel.presenceState();
           
+          // Clear existing participants to avoid duplicates
+          this.participants.clear();
+          
           // Connect to all existing participants
           Object.values(presenceState).forEach((presences: any) => {
             presences.forEach((presence: any) => {
               if (presence.userId !== this.userId) {
+                console.log('👥 Found existing participant:', presence.userId, presence.displayName);
                 this.handleParticipantJoined(presence);
               }
             });
@@ -200,7 +209,9 @@ export class VideoConferenceSDK {
           console.log('👤 New participant joined:', payload);
           if (payload.newPresences) {
             payload.newPresences.forEach((presence: any) => {
-              this.handleParticipantJoined(presence);
+              if (presence.userId !== this.userId) {
+                this.handleParticipantJoined(presence);
+              }
             });
           }
         })
@@ -227,13 +238,17 @@ export class VideoConferenceSDK {
         .on('broadcast', { event: 'screen-share' }, (payload) => {
           this.handleScreenShare(payload.payload);
         })
+        .on('broadcast', { event: 'participant-role-update' }, (payload) => {
+          this.handleParticipantRoleUpdate(payload.payload);
+        })
         .subscribe(async (status) => {
           console.log('📡 Signaling channel status:', status);
           if (status === 'SUBSCRIBED') {
-            // Join presence
+            // Join presence with role information
             const presenceData = {
               userId: this.userId,
               displayName: this.displayName,
+              role: role,
               videoEnabled: this.isVideoEnabled,
               audioEnabled: this.isAudioEnabled,
               screenSharing: this.isScreenSharing,
@@ -306,14 +321,14 @@ export class VideoConferenceSDK {
 
     const participant: Participant = {
       id: participantData.userId,
-      name: participantData.displayName,
+      name: participantData.displayName || participantData.userId,
       role: participantData.role || 'participant',
-      videoEnabled: participantData.videoEnabled,
-      audioEnabled: participantData.audioEnabled,
-      screenSharing: participantData.screenSharing,
+      videoEnabled: participantData.videoEnabled !== false,
+      audioEnabled: participantData.audioEnabled !== false,
+      screenSharing: participantData.screenSharing || false,
       handRaised: false,
       connectionQuality: 'good',
-      joinedAt: new Date(participantData.joinedAt)
+      joinedAt: new Date(participantData.joinedAt || new Date().toISOString())
     };
 
     this.participants.set(participantData.userId, participant);
@@ -806,6 +821,134 @@ export class VideoConferenceSDK {
    */
   isConnectionActive(): boolean {
     return this.isConnected;
+  }
+
+  /**
+   * Ensure room exists in database, create if it doesn't
+   */
+  private async ensureRoomExists(role: string): Promise<void> {
+    if (!this.roomId) return;
+
+    try {
+      // Check if room exists
+      const { data: existingRoom, error: fetchError } = await this.supabase
+        .from('video_conference_rooms')
+        .select('*')
+        .eq('room_id', this.roomId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.warn('⚠️ Error checking room existence:', fetchError);
+        return;
+      }
+
+      if (!existingRoom) {
+        // Create room if it doesn't exist and user has permission
+        if (role === 'host' || role === 'moderator') {
+          await this.supabase
+            .from('video_conference_rooms')
+            .insert({
+              room_id: this.roomId,
+              room_name: `Conference ${this.roomId}`,
+              created_by: this.userId,
+              host_user_id: this.userId,
+              max_participants: this.config.maxParticipants,
+              is_active: true,
+              is_public: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          console.log('✅ Room created in database');
+        }
+      } else {
+        console.log('✅ Room already exists in database');
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to ensure room exists (continuing anyway):', error);
+    }
+  }
+
+  /**
+   * Handle participant role updates
+   */
+  private handleParticipantRoleUpdate(payload: any): void {
+    console.log('👤 Participant role update:', payload);
+    
+    const participant = this.participants.get(payload.participantId);
+    if (participant) {
+      participant.role = payload.role;
+      this.emit('participant-updated', { participant });
+    }
+  }
+
+  /**
+   * Get current user role
+   */
+  getUserRole(): 'host' | 'moderator' | 'participant' {
+    return this.userRole;
+  }
+
+  /**
+   * Change participant role (host/moderator only)
+   */
+  async changeParticipantRole(participantId: string, newRole: 'host' | 'moderator' | 'participant'): Promise<void> {
+    if (this.userRole !== 'host' && this.userRole !== 'moderator') {
+      throw new Error('Only hosts and moderators can change participant roles');
+    }
+
+    try {
+      // Update in database
+      await this.supabase
+        .from('video_conference_participants')
+        .update({ role: newRole })
+        .eq('room_id', this.roomId)
+        .eq('user_id', participantId);
+
+      // Broadcast role change
+      await this.sendSignalingMessage('participant-role-update', {
+        participantId,
+        role: newRole
+      });
+
+      console.log(`✅ Changed role for ${participantId} to ${newRole}`);
+    } catch (error) {
+      console.error('❌ Failed to change participant role:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove participant (host/moderator only)
+   */
+  async removeParticipant(participantId: string, reason?: string): Promise<void> {
+    if (this.userRole !== 'host' && this.userRole !== 'moderator') {
+      throw new Error('Only hosts and moderators can remove participants');
+    }
+
+    try {
+      // Update in database
+      await this.supabase
+        .from('video_conference_participants')
+        .update({ 
+          is_active: false,
+          removed_by: this.userId,
+          removal_reason: reason || 'Removed by moderator',
+          left_at: new Date().toISOString()
+        })
+        .eq('room_id', this.roomId)
+        .eq('user_id', participantId);
+
+      // Broadcast removal
+      await this.sendSignalingMessage('participant-removed', {
+        participantId,
+        reason: reason || 'Removed by moderator'
+      });
+
+      console.log(`✅ Removed participant ${participantId}`);
+    } catch (error) {
+      console.error('❌ Failed to remove participant:', error);
+      throw error;
+    }
   }
 
   /**

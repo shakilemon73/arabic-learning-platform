@@ -13,6 +13,7 @@ import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import CourseRegistration from "@/pages/course-registration";
 import LiveClass from "@/pages/live-class";
+import LiveClassesPage from "@/pages/live-classes";
 import EnterpriseMeet from "@/pages/enterprise-meet-real";
 import VideoMeet from "@/pages/video-meet";
 import VideoRoomJoin from "@/pages/video-room-join";
@@ -46,6 +47,12 @@ function Router() {
       <Route path="/live-class">
         <AuthGuard>
           <LiveClass />
+        </AuthGuard>
+      </Route>
+      
+      <Route path="/live-classes">
+        <AuthGuard>
+          <LiveClassesPage />
         </AuthGuard>
       </Route>
       

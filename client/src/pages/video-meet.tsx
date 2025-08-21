@@ -84,6 +84,18 @@ export default function VideoMeetPage() {
     window.history.pushState({}, '', window.location.pathname);
   };
 
+  // Determine user role based on profile
+  const getUserRole = (): 'host' | 'moderator' | 'participant' => {
+    if (!profile) return 'participant';
+    
+    const userRole = profile.role;
+    if (userRole === 'admin' || userRole === 'instructor') {
+      return 'host';
+    }
+    // Note: 'moderator' role not available in current schema, using participant
+    return 'participant';
+  };
+
   // If in meeting, show the video conference component
   if (isInMeeting && joinedRoomId) {
     return (
@@ -91,6 +103,7 @@ export default function VideoMeetPage() {
         roomId={joinedRoomId}
         userId={user.id}
         displayName={displayName}
+        userRole={getUserRole()}
         supabaseUrl={SUPABASE_CONFIG.url}
         supabaseKey={SUPABASE_CONFIG.key}
         onLeave={leaveMeeting}
@@ -98,7 +111,7 @@ export default function VideoMeetPage() {
     );
   }
 
-  // Show meeting lobby
+  // Show meeting lobby with enhanced live class management
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <Header />
@@ -114,8 +127,13 @@ export default function VideoMeetPage() {
               Video Conference
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Zoom-like video conferencing with real multi-user support and screen sharing
+              Production-ready multi-user video conferencing with role-based permissions
             </p>
+            {profile?.role === 'admin' && (
+              <div className="mt-2">
+                <Badge className="bg-blue-500 text-white">Admin - Host Privileges</Badge>
+              </div>
+            )}
           </div>
 
           {/* Meeting controls */}

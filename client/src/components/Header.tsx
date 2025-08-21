@@ -13,14 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
-export default function Header() {
+export function Header() {
   const [location, setLocation] = useLocation();
   const { user, profile, signOut, loading } = useAuth();
 
   const navItems = [
     { href: "/", label: "হোম", icon: Home, active: location === "/" },
     { href: "/dashboard", label: "ড্যাশবোর্ড", icon: BookOpen, active: location === "/dashboard", requireAuth: true },
-    { href: "/live-class", label: "লাইভ ক্লাস", icon: Monitor, active: location === "/live-class", requireAuth: true },
+    { href: "/live-classes", label: "লাইভ ক্লাস", icon: Monitor, active: location === "/live-classes", requireAuth: true },
     { href: "/video-meet", label: "ভিডিও কনফারেন্স", icon: Video, active: location === "/video-meet", requireAuth: true },
   ];
 
@@ -151,3 +151,5 @@ export default function Header() {
     </header>
   );
 }
+
+export default Header;

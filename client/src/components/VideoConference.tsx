@@ -17,6 +17,7 @@ interface VideoConferenceProps {
   roomId: string;
   userId: string;
   displayName: string;
+  userRole: 'host' | 'moderator' | 'participant';
   supabaseUrl: string;
   supabaseKey: string;
   onLeave?: () => void;
@@ -39,6 +40,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
   roomId,
   userId,
   displayName,
+  userRole,
   supabaseUrl,
   supabaseKey,
   onLeave
@@ -156,8 +158,8 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
 
         setSdk(videoSDK);
 
-        // Join the room
-        await videoSDK.joinRoom(roomId, userId, displayName, 'participant');
+        // Join the room with proper role
+        await videoSDK.joinRoom(roomId, userId, displayName, userRole);
         
       } catch (error) {
         console.error('❌ Failed to initialize video conference:', error);
@@ -450,7 +452,9 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 {displayName.charAt(0).toUpperCase()}
               </div>
               <span className="text-white">You</span>
-              <Badge variant="outline" className="ml-auto">Host</Badge>
+              <Badge variant="outline" className="ml-auto">
+                {userRole === 'host' ? 'Host' : userRole === 'moderator' ? 'Moderator' : 'Participant'}
+              </Badge>
             </div>
             
             {participants.map((participant) => (
@@ -458,10 +462,23 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
                   {participant.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-white">{participant.name}</span>
-                <div className="ml-auto flex space-x-1">
+                <div className="flex-1">
+                  <span className="text-white">{participant.name}</span>
+                  <Badge 
+                    variant="outline" 
+                    className={`ml-2 text-xs ${
+                      participant.role === 'host' ? 'border-blue-500 text-blue-400' :
+                      participant.role === 'moderator' ? 'border-yellow-500 text-yellow-400' :
+                      'border-gray-500 text-gray-400'
+                    }`}
+                  >
+                    {participant.role === 'host' ? 'Host' : participant.role === 'moderator' ? 'Moderator' : 'Student'}
+                  </Badge>
+                </div>
+                <div className="flex space-x-1">
                   {!participant.videoEnabled && <VideoOff className="h-4 w-4 text-red-400" />}
                   {!participant.audioEnabled && <MicOff className="h-4 w-4 text-red-400" />}
+                  {participant.screenSharing && <MonitorUp className="h-4 w-4 text-blue-400" />}
                 </div>
               </div>
             ))}
