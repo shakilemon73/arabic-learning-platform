@@ -60,8 +60,7 @@ export { InteractionManager } from './core/InteractionManager';
 // Virtual Backgrounds
 export { VirtualBackgroundManager } from './core/VirtualBackgroundManager';
 
-// Recording (Legacy)
-export { RecordingManager as LegacyRecordingManager } from './core/RecordingManager';
+// Note: RecordingManager is now only available as EnterpriseRecordingManager
 
 // Moderation
 export { ModeratorManager } from './core/ModeratorManager';
@@ -76,8 +75,7 @@ export type { EnterpriseVideoSDKConfig, ParticipantStream, RoomSession } from '.
 export { SFUManager } from './enterprise/SFUManager';
 export type { SFUConfig, MediaStream as SFUMediaStream, SFUStats } from './enterprise/SFUManager';
 
-export { AdaptiveBitrateManager } from './enterprise/AdaptiveBitrateManager';
-export type { NetworkConditions, QualitySettings, AdaptationRules } from './enterprise/AdaptiveBitrateManager';
+export { AdaptiveBitrateManager } from './core/AdaptiveBitrateManager';
 
 export { AudioProcessingManager } from './enterprise/AudioProcessingManager';
 export type { AudioProcessingConfig, AudioMetrics, VoiceActivityEvent } from './enterprise/AudioProcessingManager';

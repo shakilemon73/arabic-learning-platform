@@ -260,7 +260,7 @@ export class BreakoutRoomManager extends EventEmitter {
   async openBreakoutRooms(): Promise<void> {
     if (!this.isActive && this.breakoutRooms.size > 0) {
       // Mark all rooms as open
-      for (const room of this.breakoutRooms.values()) {
+      for (const room of Array.from(this.breakoutRooms.values())) {
         room.isOpen = true;
       }
 
@@ -312,7 +312,7 @@ export class BreakoutRoomManager extends EventEmitter {
       }
 
       // Mark all rooms as closed
-      for (const room of this.breakoutRooms.values()) {
+      for (const room of Array.from(this.breakoutRooms.values())) {
         room.isOpen = false;
         room.closedAt = new Date();
       }
@@ -456,7 +456,7 @@ export class BreakoutRoomManager extends EventEmitter {
   private getAssignmentMap(): { [roomId: string]: string[] } {
     const map: { [roomId: string]: string[] } = {};
     
-    for (const assignment of this.assignments.values()) {
+    for (const assignment of Array.from(this.assignments.values())) {
       if (!map[assignment.roomId]) {
         map[assignment.roomId] = [];
       }

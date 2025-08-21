@@ -212,7 +212,7 @@ export class RecordingManager extends EventEmitter {
     const videoElements = new Map<string, HTMLVideoElement>();
     let index = 0;
     
-    for (const [participantId, stream] of participantStreams) {
+    for (const [participantId, stream] of Array.from(participantStreams)) {
       if (!stream.getVideoTracks().length) continue;
       
       const video = document.createElement('video');
@@ -238,7 +238,7 @@ export class RecordingManager extends EventEmitter {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
       let index = 0;
-      for (const [participantId, video] of videoElements) {
+      for (const [participantId, video] of Array.from(videoElements)) {
         const row = Math.floor(index / gridLayout.cols);
         const col = index % gridLayout.cols;
         
@@ -298,7 +298,7 @@ export class RecordingManager extends EventEmitter {
     masterGain.connect(this.audioDestination);
     
     // Mix all audio streams
-    for (const [participantId, stream] of participantStreams) {
+    for (const [participantId, stream] of Array.from(participantStreams)) {
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) continue;
       
