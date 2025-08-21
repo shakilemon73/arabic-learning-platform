@@ -158,8 +158,9 @@ function LiveClassContent() {
       const enterpriseRoomId = `arabic-class-${selectedClass.id}`;
       
       // Create or get SFU instance
+      let sfuInstance = null;
       try {
-        let sfuInstance = await SFUManagementAPI.getSFUForRoom(enterpriseRoomId);
+        sfuInstance = await SFUManagementAPI.getSFUForRoom(enterpriseRoomId);
         if (!sfuInstance) {
           console.log('Creating new SFU instance...');
           sfuInstance = await SFUManagementAPI.createSFUInstance({
@@ -355,11 +356,11 @@ function LiveClassContent() {
               
               {/* Class Resources Section */}
               <div className="space-y-4">
-                {selectedClass?.lesson_content && (
+                {(selectedClass as any)?.lesson_content && (
                   <div className="bg-gray-800 rounded-lg p-4">
                     <h4 className="font-bengali text-white font-medium mb-2">আজকের পাঠ্য</h4>
                     <div className="space-y-2 font-bengali text-gray-300">
-                      {selectedClass.lesson_content.split('\n').map((item: string, index: number) => (
+                      {(selectedClass as any).lesson_content.split('\n').map((item: string, index: number) => (
                         <div key={index}>• {item}</div>
                       ))}
                     </div>
