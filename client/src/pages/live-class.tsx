@@ -25,8 +25,8 @@ import HomeworkSubmissions from '@/components/HomeworkSubmissions';
 
 // Enterprise Video SDK Configuration
 const VIDEO_SDK_CONFIG = {
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://sgyanvjlwlrzcrpjwlsd.supabase.co',
-  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNneWFudmpsd2xyemNycGp3bHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NTg1MjAsImV4cCI6MjA3MDEzNDUyMH0.5xjMdSUdeHGln68tfuw626q4xDZkuR8Xg_e_w6g9iJk',
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
   enableAI: true,
   enableRecording: true,
   enableWhiteboard: true,
@@ -97,12 +97,12 @@ function LiveClassContent() {
         await NetworkQualityAPI.submitNetworkMetric({
           room_id: roomId,
           participant_id: user.id,
-          latency_ms: (connectionStats as any)?.latency || Math.random() * 100 + 20,
-          bandwidth_kbps: (connectionStats as any)?.bandwidth || Math.random() * 2000 + 500,
-          packet_loss_percentage: (connectionStats as any)?.packetLoss || Math.random() * 5,
-          jitter_ms: (connectionStats as any)?.jitter || Math.random() * 20 + 5,
+          latency_ms: (connectionStats as any)?.latency || 0,
+          bandwidth_kbps: (connectionStats as any)?.bandwidth || 0,
+          packet_loss_percentage: (connectionStats as any)?.packetLoss || 0,
+          jitter_ms: (connectionStats as any)?.jitter || 0,
           connection_type: 'wifi',
-          quality_score: (connectionStats as any)?.quality || (Math.random() > 0.8 ? 'excellent' : 'good'),
+          quality_score: (connectionStats as any)?.quality || 'unknown',
           network_path: 'direct'
         });
       } catch (err) {
@@ -204,12 +204,12 @@ function LiveClassContent() {
           is_screen_sharing: false,
           device_type: /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
           browser_name: navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Unknown',
-          browser_version: '120.0',
-          connection_quality: 'excellent',
-          sfu_instance_id: 'sfu_us_east_001',
-          bandwidth_kbps: 1000,
-          avg_latency_ms: 45,
-          total_packets_lost: 0,
+          browser_version: navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || 'unknown',
+          connection_quality: (connectionStats as any)?.quality || 'unknown',
+          sfu_instance_id: sfuInstance?.id || 'unknown',
+          bandwidth_kbps: (connectionStats as any)?.bandwidth || 0,
+          avg_latency_ms: (connectionStats as any)?.latency || 0,
+          total_packets_lost: (connectionStats as any)?.packetsLost || 0,
           adaptive_bitrate_enabled: true,
           audio_processing_enabled: true,
           network_resilience_enabled: true
@@ -335,8 +335,8 @@ function LiveClassContent() {
           <TabsContent value="whiteboard" className="flex-1 m-0 p-4 bg-gray-800">
             <div className="h-full bg-gray-900 rounded-lg p-4">
               <h3 className="font-bengali text-white text-lg mb-4">ইন্টারেক্টিভ হোয়াইটবোর্ড</h3>
-              <div className="flex-1 bg-white rounded-lg min-h-96 border-2 border-gray-600">
-                <p className="text-gray-600 font-bengali text-center p-8">হোয়াইটবোর্ড এখানে লোড হবে...</p>
+              <div className="flex-1 bg-white rounded-lg min-h-96 border-2 border-gray-600 flex items-center justify-center">
+                <p className="text-gray-600 font-bengali text-center">হোয়াইটবোর্ড ফিচার শীঘ্রই আসছে</p>
               </div>
             </div>
           </TabsContent>
@@ -355,14 +355,16 @@ function LiveClassContent() {
               
               {/* Class Resources Section */}
               <div className="space-y-4">
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h4 className="font-bengali text-white font-medium mb-2">আজকের পাঠ্য</h4>
-                  <ul className="space-y-2 font-bengali text-gray-300">
-                    <li>• আরবি হরফের পরিচয়</li>
-                    <li>• হরফের উচ্চারণ অনুশীলন</li>
-                    <li>• সাধারণ শব্দগঠন</li>
-                  </ul>
-                </div>
+                {selectedClass?.lesson_content && (
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <h4 className="font-bengali text-white font-medium mb-2">আজকের পাঠ্য</h4>
+                    <div className="space-y-2 font-bengali text-gray-300">
+                      {selectedClass.lesson_content.split('\n').map((item: string, index: number) => (
+                        <div key={index}>• {item}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -385,7 +387,7 @@ function LiveClassContent() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-headline font-bengali text-white">
-                    {selectedClass?.title_bn || 'আরবি ক্লাস'}
+                    {selectedClass?.title_bn || selectedClass?.title || 'ক্লাস'}
                   </CardTitle>
                   <Badge variant="secondary" className="text-sm">
                     লাইভ ক্লাস
@@ -393,9 +395,11 @@ function LiveClassContent() {
                 </div>
               </CardHeader>
               <CardContent className="text-white">
-                <p className="text-lg font-bengali mb-6 opacity-90">
-                  {selectedClass?.description_bn || 'আরবি ভাষা শিক্ষার ক্লাস'}
-                </p>
+                {selectedClass?.description_bn && (
+                  <p className="text-lg font-bengali mb-6 opacity-90">
+                    {selectedClass.description_bn}
+                  </p>
+                )}
                 
                 <div className="grid grid-cols-2 gap-6 mb-8">
                   <div className="flex items-center space-x-3">
