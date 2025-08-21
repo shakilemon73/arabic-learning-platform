@@ -59,7 +59,9 @@ export class WebRTCClient {
 
   private getSignalingUrl(): string {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}/webrtc-signaling`;
+    const host = window.location.hostname;
+    const port = '3000'; // Backend server port
+    return `${protocol}//${host}:${port}/webrtc-signaling`;
   }
 
   // Initialize WebRTC client
@@ -100,7 +102,7 @@ export class WebRTCClient {
         this.ws = new WebSocket(this.config.signalingUrl);
 
         this.ws.onopen = () => {
-          console.log('🔗 Connected to signaling server');
+          console.log('🔗 Connected to signaling server at:', this.config.signalingUrl);
           this.isConnected = true;
           if (this.onConnectionStateChange) {
             this.onConnectionStateChange('connected');
@@ -122,6 +124,7 @@ export class WebRTCClient {
 
         this.ws.onerror = (error) => {
           console.error('❌ Signaling connection error:', error);
+          console.error('❌ Failed to connect to:', this.config.signalingUrl);
           reject(new Error('Failed to connect to signaling server'));
         };
 
@@ -170,13 +173,17 @@ export class WebRTCClient {
 
   // Handle signaling messages
   private async handleSignalingMessage(message: SignalingMessage): Promise<void> {
+    console.log('📨 Received signaling message:', message.type, message);
+    
     switch (message.type) {
       case 'joined-room':
         console.log('✅ Successfully joined room:', message.roomId);
+        console.log('👥 Existing participants:', message.data?.participants);
         // Create peer connections to existing participants
         if (message.data?.participants) {
           for (const participant of message.data.participants) {
             if (participant.id !== this.participantId) {
+              console.log('🔗 Creating connection to existing participant:', participant.id);
               await this.createPeerConnection(participant.id, true);
             }
           }
@@ -188,10 +195,8 @@ export class WebRTCClient {
         if (this.onParticipantJoined && message.data?.participant) {
           this.onParticipantJoined(message.data.participant);
         }
-        // Create peer connection to new participant (existing users initiate)
-        if (message.data?.participant?.id && message.data.participant.id !== this.participantId) {
-          await this.createPeerConnection(message.data.participant.id, false);
-        }
+        // Don't create connection immediately - wait for them to create offer
+        console.log('⏳ Waiting for new participant to initiate connection...');
         break;
 
       case 'participant-left':
@@ -233,17 +238,31 @@ export class WebRTCClient {
   // Create peer connection
   private async createPeerConnection(participantId: string, createOffer: boolean = false): Promise<void> {
     if (this.peerConnections.has(participantId)) {
+      console.log('⚠️ Peer connection already exists for:', participantId);
       return; // Already exists
     }
 
+    console.log('🔧 Creating peer connection for:', participantId, 'createOffer:', createOffer);
     const pc = new RTCPeerConnection({ iceServers: this.config.iceServers });
     this.peerConnections.set(participantId, pc);
+
+    // Connection state logging
+    pc.onconnectionstatechange = () => {
+      console.log('🔗 Connection state changed for', participantId, ':', pc.connectionState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('🧊 ICE connection state changed for', participantId, ':', pc.iceConnectionState);
+    };
 
     // Add local stream
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
+        console.log('➕ Adding local track to peer connection:', track.kind, 'for', participantId);
         pc.addTrack(track, this.localStream!);
       });
+    } else {
+      console.warn('⚠️ No local stream available when creating peer connection for:', participantId);
     }
 
     // Handle remote stream
@@ -286,14 +305,17 @@ export class WebRTCClient {
 
   // Handle offer
   private async handleOffer(fromParticipantId: string, offer: RTCSessionDescriptionInit): Promise<void> {
+    console.log('📨 Handling offer from:', fromParticipantId);
     await this.createPeerConnection(fromParticipantId, false);
     const pc = this.peerConnections.get(fromParticipantId);
     
     if (pc) {
+      console.log('🔗 Setting remote description and creating answer for:', fromParticipantId);
       await pc.setRemoteDescription(offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       
+      console.log('📤 Sending answer to:', fromParticipantId);
       this.sendSignalingMessage({
         type: 'answer',
         roomId: this.roomId,
