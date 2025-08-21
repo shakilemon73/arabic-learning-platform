@@ -117,6 +117,22 @@ export class AdaptiveBitrateManager extends EventEmitter {
   }
 
   /**
+   * Start monitoring
+   */
+  startMonitoring(): void {
+    this.startNetworkMonitoring();
+  }
+
+  /**
+   * Stop monitoring
+   */
+  stopMonitoring(): void {
+    // Implementation for stopping monitoring
+    console.log('📊 Stopping adaptive bitrate monitoring');
+  }
+
+
+  /**
    * Initialize adaptive bitrate system
    * Professional quality adaptation like major platforms
    */

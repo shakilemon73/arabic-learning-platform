@@ -215,10 +215,7 @@ export class EnterpriseVideoSDK extends EventEmitter {
 
       // Start adaptive bitrate management
       if (this.config.enableAdaptiveBitrate) {
-        this.adaptiveBitrateManager = new AdaptiveBitrateManager(
-          sessionConfig.userId,
-          this.peerConnections
-        );
+        this.adaptiveBitrateManager = new AdaptiveBitrateManager(this.peerConnections);
         this.adaptiveBitrateManager.startMonitoring();
         
         // Forward quality events
@@ -778,11 +775,11 @@ export class EnterpriseVideoSDK extends EventEmitter {
     }
 
     // Get adaptive bitrate statistics
-    if (this.adaptiveBitrateManager) {
+    if (this.adaptiveBitrateManager && this.currentSession) {
       stats.quality = {
-        current: this.adaptiveBitrateManager.getCurrentQuality(),
-        network: this.adaptiveBitrateManager.getNetworkConditions(),
-        history: this.adaptiveBitrateManager.getAdaptationHistory()
+        current: this.adaptiveBitrateManager.getCurrentQuality(this.currentSession.userId),
+        network: this.adaptiveBitrateManager.getNetworkConditions(this.currentSession.userId),
+        history: this.adaptiveBitrateManager.getAdaptationHistory(this.currentSession.userId)
       };
     }
 
