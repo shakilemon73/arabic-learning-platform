@@ -145,12 +145,12 @@ export const getLiveClasses = async (limit = 10) => {
     .from('live_classes')
     .select(`
       *,
-      course_modules!inner (
+      course_modules (
         title,
         title_bn,
         level
       ),
-      instructors!inner (
+      instructors (
         name,
         name_bn,
         email
@@ -159,6 +159,7 @@ export const getLiveClasses = async (limit = 10) => {
     .eq('is_active', true)
     .order('scheduled_at', { ascending: false })
     .limit(limit);
+  
   return { data, error };
 };
 

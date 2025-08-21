@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -70,28 +70,37 @@ export default function Dashboard() {
     retry: 1,
   });
 
-  const { data: upcomingClasses, isLoading: classesLoading, error: classesError } = useQuery({
-    queryKey: ['live-classes'],
-    queryFn: async () => {
-      console.log('🔍 Dashboard: Calling getLiveClasses()...');
-      const result = await getLiveClasses();
-      console.log('🔍 Dashboard: getLiveClasses result:', result);
-      
-      if (result && result.error) {
-        console.error('❌ Dashboard: Error fetching live classes:', result.error);
-        throw result.error;
+  // Direct state management for live classes - bypassing TanStack Query issues
+  const [upcomingClasses, setUpcomingClasses] = useState<any[]>([]);
+  const [classesLoading, setClassesLoading] = useState(true);
+  const [classesError, setClassesError] = useState<any>(null);
+  
+  useEffect(() => {
+    const fetchClasses = async () => {
+      setClassesLoading(true);
+      try {
+        const result = await getLiveClasses();
+        if (result && result.error) {
+          setClassesError(result.error);
+          setUpcomingClasses([]);
+        } else if (result && result.data) {
+          setUpcomingClasses(result.data);
+          setClassesError(null);
+        } else {
+          setUpcomingClasses([]);
+        }
+      } catch (error) {
+        setClassesError(error);
+        setUpcomingClasses([]);
+      } finally {
+        setClassesLoading(false);
       }
-      
-      const classes = result && result.data ? result.data : (Array.isArray(result) ? result : []);
-      console.log('🔍 Dashboard: Final classes array:', classes);
-      return classes;
-    },
-    initialData: [],
-    staleTime: 1000 * 60 * 5, // 5 minutes for better caching
-    refetchOnWindowFocus: false, // Disable to prevent constant refetching
-    retry: 1, // Reduce retries to prevent hanging
-    refetchInterval: false, // Disable automatic refetching
-  });
+    };
+    
+    if (user?.id) {
+      fetchClasses();
+    }
+  }, [user?.id]);
   
   // Debug: Show what classes are loaded from your Supabase
   console.log('🏠 Dashboard classes from Supabase:', upcomingClasses);
