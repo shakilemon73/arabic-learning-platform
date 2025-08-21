@@ -33,10 +33,10 @@ export default function EnterpriseRealMeetPage() {
   // WebRTC Client
   const webrtcClient = useRef<WebRTCClient | null>(null);
   
-  // Room state
+  // Room state - Use a fixed room ID that multiple users can join
   const [roomId, setRoomId] = useState<string>(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('room') || `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return urlParams.get('room') || 'arabic-learning-room'; // Fixed shared room ID
   });
   
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -199,13 +199,25 @@ export default function EnterpriseRealMeetPage() {
       {/* Meeting Container */}
       <div className="container mx-auto px-4 py-6">
         
-        {/* Connection Status */}
+        {/* Connection Status & Room Info */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Badge variant={isConnected ? "default" : "destructive"}>
               {isConnecting ? 'Connecting...' : connectionState}
             </Badge>
             <span className="text-sm text-slate-400">Room: {roomId}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const roomUrl = `${window.location.origin}/enterprise-meet?room=${roomId}`;
+                navigator.clipboard.writeText(roomUrl);
+                alert('Room URL copied! Share this link with others to join this meeting:\n\n' + roomUrl);
+              }}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              Share Room
+            </Button>
           </div>
           
           <div className="flex items-center gap-2">

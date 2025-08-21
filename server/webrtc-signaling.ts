@@ -143,13 +143,15 @@ export class WebRTCSignalingServer {
     this.broadcastToRoom(roomId, {
       type: 'participant-joined',
       roomId,
-      participant: {
-        id: participant.id,
-        name: participant.name,
-        role: participant.role,
-        videoEnabled: participant.videoEnabled,
-        audioEnabled: participant.audioEnabled,
-        screenSharing: participant.screenSharing
+      data: {
+        participant: {
+          id: participant.id,
+          name: participant.name,
+          role: participant.role,
+          videoEnabled: participant.videoEnabled,
+          audioEnabled: participant.audioEnabled,
+          screenSharing: participant.screenSharing
+        }
       }
     }, participantId);
 

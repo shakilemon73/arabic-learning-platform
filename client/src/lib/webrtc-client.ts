@@ -188,7 +188,10 @@ export class WebRTCClient {
         if (this.onParticipantJoined && message.data?.participant) {
           this.onParticipantJoined(message.data.participant);
         }
-        // The joining participant will initiate the connection
+        // Create peer connection to new participant (existing users initiate)
+        if (message.data?.participant?.id && message.data.participant.id !== this.participantId) {
+          await this.createPeerConnection(message.data.participant.id, false);
+        }
         break;
 
       case 'participant-left':
