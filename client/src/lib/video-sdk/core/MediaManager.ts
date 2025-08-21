@@ -45,18 +45,17 @@ export class MediaManager extends EventEmitter {
    */
   async initialize(): Promise<void> {
     try {
-      // Request permission to enumerate devices
-      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      
-      // Get available devices
+      // Get available devices first (may not have labels without permission)
       await this.updateAvailableDevices();
       
       // Listen for device changes
       navigator.mediaDevices.addEventListener('devicechange', this.handleDeviceChange.bind(this));
       
       this.emit('initialized');
+      console.log('✅ MediaManager initialized successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('❌ MediaManager initialization failed:', errorMessage);
       this.emit('error', { error: errorMessage });
       throw error;
     }
@@ -67,29 +66,44 @@ export class MediaManager extends EventEmitter {
    */
   async getUserMedia(constraints?: MediaConstraints): Promise<MediaStream> {
     try {
-      const mediaConstraints: MediaStreamConstraints = {
+      // Start with simple constraints and fallback to basic if specific devices fail
+      let mediaConstraints: MediaStreamConstraints = {
         video: constraints?.video ? {
           width: { ideal: constraints.video.width || 1280 },
           height: { ideal: constraints.video.height || 720 },
           frameRate: { ideal: constraints.video.frameRate || 30 },
-          facingMode: constraints.video.facingMode || 'user',
-          deviceId: this.selectedDevices.camera ? { exact: this.selectedDevices.camera } : undefined
+          facingMode: constraints.video.facingMode || 'user'
+          // Don't specify deviceId initially to avoid "device not found" errors
         } : true,
         audio: constraints?.audio ? {
           echoCancellation: constraints.audio.echoCancellation !== false,
           noiseSuppression: constraints.audio.noiseSuppression !== false,
-          autoGainControl: constraints.audio.autoGainControl !== false,
-          deviceId: this.selectedDevices.microphone ? { exact: this.selectedDevices.microphone } : undefined
+          autoGainControl: constraints.audio.autoGainControl !== false
+          // Don't specify deviceId initially to avoid "device not found" errors
         } : true
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      this.currentStream = stream;
-      
-      this.emit('stream-acquired', { stream });
-      return stream;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        this.currentStream = stream;
+        this.emit('stream-acquired', { stream });
+        return stream;
+      } catch (firstError) {
+        // Fallback to basic constraints if advanced settings fail
+        console.log('🔄 Falling back to basic media constraints...');
+        const basicConstraints: MediaStreamConstraints = {
+          video: true,
+          audio: true
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia(basicConstraints);
+        this.currentStream = stream;
+        this.emit('stream-acquired', { stream });
+        return stream;
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('❌ Failed to get user media:', errorMessage);
       this.emit('error', { error: errorMessage });
       throw error;
     }
@@ -133,7 +147,7 @@ export class MediaManager extends EventEmitter {
   async getScreenShare(): Promise<MediaStream> {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { mediaSource: 'screen' },
+        video: true,
         audio: true
       });
 

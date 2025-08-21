@@ -66,14 +66,16 @@ export default function EnterpriseRealMeetPage() {
    * Initialize and join video conference
    */
   const joinRoom = useCallback(async () => {
-    if (!user || !profile?.display_name || isConnecting) {
+    if (!user || isConnecting) {
       console.log('❌ Cannot join: missing user data or already connecting');
       return;
     }
 
     setIsConnecting(true);
     try {
-      const displayName = profile.display_name;
+      const displayName = profile?.first_name && profile?.last_name 
+        ? `${profile.first_name} ${profile.last_name}` 
+        : profile?.first_name || profile?.email || user.email || 'Anonymous';
       
       // Initialize Real Video Conference SDK
       const sdk = new RealVideoConferenceSDK({
@@ -202,7 +204,7 @@ export default function EnterpriseRealMeetPage() {
    * Auto-join on component mount
    */
   useEffect(() => {
-    if (user && profile?.display_name && !isConnected && !isConnecting) {
+    if (user && !isConnected && !isConnecting) {
       joinRoom();
     }
   }, [user, profile, isConnected, isConnecting, joinRoom]);
@@ -405,7 +407,7 @@ export default function EnterpriseRealMeetPage() {
                 {/* Current User */}
                 <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800 rounded">
                   <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                    {profile?.display_name?.charAt(0).toUpperCase()}
+                    {(profile?.first_name || profile?.email || user.email || 'A').charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-sm">You</p>

@@ -138,24 +138,21 @@ export class RealVideoConferenceSDK extends EventEmitter {
       // Initialize MediaManager first
       await this.mediaManager.initialize();
       
-      // Get user media with optimal settings
-      const constraints: MediaConstraints = {
-        video: {
-          width: 1280,
-          height: 720,
-          frameRate: 30,
-          facingMode: 'user'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      };
-      
-      const stream = await this.mediaManager.getUserMedia(constraints);
-      console.log('✅ Real media stream acquired successfully');
-      return stream;
+      // Try to get user media with simple constraints first
+      try {
+        const stream = await this.mediaManager.getUserMedia();
+        console.log('✅ Real media stream acquired successfully');
+        return stream;
+      } catch (mediaError) {
+        // If MediaManager fails, try direct browser API as fallback
+        console.log('🔄 MediaManager failed, trying direct browser API...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        console.log('✅ Direct media stream acquired successfully');
+        return stream;
+      }
       
     } catch (error) {
       console.error('❌ Failed to initialize media:', error);
