@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { VideoSDK, VideoSDKConfig, SessionConfig, ParticipantInfo } from '@/lib/video-sdk';
+import { supabase } from '@/lib/supabase';
 
 interface VideoSDKContextType {
   sdk: VideoSDK | null;
@@ -225,6 +226,8 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
     sdkInstance.on('connected', (data) => {
       console.log('🔗 Connected to room:', data.roomId);
       setIsConnected(true);
+      // Setup database participant subscription when connected
+      setupParticipantSubscription(data.roomId);
     });
 
     sdkInstance.on('disconnected', () => {
@@ -243,7 +246,10 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
     // Participant events for real-time video
     sdkInstance.on('participant-joined', (data) => {
       console.log('👤 New participant joined:', data.participant.name);
-      setParticipants(prev => [...prev, data.participant]);
+      setParticipants(prev => {
+        const exists = prev.find(p => p.id === data.participant.id);
+        return exists ? prev : [...prev, data.participant];
+      });
     });
 
     sdkInstance.on('participant-left', (data) => {
@@ -288,11 +294,106 @@ export function VideoSDKProvider({ children }: VideoSDKProviderProps) {
     });
   };
 
+  // Setup real-time participant database subscription
+  const setupParticipantSubscription = (roomId: string): void => {
+    console.log('📡 Setting up participant database subscription for room:', roomId);
+    
+    const participantChannel = supabase
+      .channel(`participants:${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'video_conference_participants',
+          filter: `room_id=eq.${roomId}`
+        },
+        (payload) => {
+          console.log('🔄 Participant database change:', payload);
+          handleParticipantDBChange(payload);
+        }
+      )
+      .subscribe();
+
+    // Store channel for cleanup
+    (window as any).__participantChannel = participantChannel;
+  };
+
+  // Handle participant database changes
+  const handleParticipantDBChange = (payload: any): void => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    
+    switch (eventType) {
+      case 'INSERT':
+        if (newRecord && newRecord.is_active) {
+          const participant: ParticipantInfo = {
+            id: newRecord.user_id,
+            name: newRecord.display_name,
+            avatar: newRecord.avatar_url,
+            role: newRecord.role,
+            videoEnabled: newRecord.is_video_enabled,
+            audioEnabled: newRecord.is_audio_enabled,
+            screenSharing: newRecord.is_screen_sharing,
+            connectionQuality: newRecord.connection_quality || 'good',
+            joinedAt: new Date(newRecord.joined_at)
+          };
+          
+          setParticipants(prev => {
+            const exists = prev.find(p => p.id === participant.id);
+            return exists ? prev : [...prev, participant];
+          });
+          
+          console.log('➕ Added participant from DB:', participant.name);
+        }
+        break;
+        
+      case 'UPDATE':
+        if (newRecord) {
+          if (newRecord.is_active) {
+            const updatedParticipant: ParticipantInfo = {
+              id: newRecord.user_id,
+              name: newRecord.display_name,
+              avatar: newRecord.avatar_url,
+              role: newRecord.role,
+              videoEnabled: newRecord.is_video_enabled,
+              audioEnabled: newRecord.is_audio_enabled,
+              screenSharing: newRecord.is_screen_sharing,
+              connectionQuality: newRecord.connection_quality || 'good',
+              joinedAt: new Date(newRecord.joined_at)
+            };
+            
+            setParticipants(prev => 
+              prev.map(p => p.id === updatedParticipant.id ? updatedParticipant : p)
+            );
+            
+            console.log('🔄 Updated participant from DB:', updatedParticipant.name);
+          } else {
+            // Participant became inactive - remove them
+            setParticipants(prev => prev.filter(p => p.id !== newRecord.user_id));
+            console.log('➖ Removed inactive participant from DB:', newRecord.display_name);
+          }
+        }
+        break;
+        
+      case 'DELETE':
+        if (oldRecord) {
+          setParticipants(prev => prev.filter(p => p.id !== oldRecord.user_id));
+          console.log('🗑️ Deleted participant from DB:', oldRecord.display_name);
+        }
+        break;
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (sdk) {
         sdk.destroy();
+      }
+      // Cleanup participant subscription
+      if ((window as any).__participantChannel) {
+        supabase.removeChannel((window as any).__participantChannel);
+        (window as any).__participantChannel = null;
       }
     };
   }, [sdk]);

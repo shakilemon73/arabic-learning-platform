@@ -316,45 +316,63 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Sign up function
+  // Sign up function with automatic profile creation
   const signUp = async (email: string, password: string, metadata?: Record<string, any>) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        data: metadata || {},
-      },
-    });
-
-    if (error) {
-      setState(prev => ({ ...prev, loading: false, error }));
-      toast({
-        title: "সাইন আপ ত্রুটি",
-        description: error.message === 'User already registered' 
-          ? "এই ইমেইল দিয়ে ইতিমধ্যে একাউন্ট রয়েছে" 
-          : error.message,
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: metadata || {},
+        },
       });
-      return { error };
+
+      if (error) {
+        setState(prev => ({ ...prev, loading: false, error }));
+        toast({
+          title: "সাইন আপ ত্রুটি",
+          description: error.message === 'User already registered' 
+            ? "এই ইমেইল দিয়ে ইতিমধ্যে একাউন্ট রয়েছে" 
+            : error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // If user was created successfully, create profile in database
+      if (data.user) {
+        try {
+          console.log('🔄 Creating user profile in database...', data.user.id);
+          await createUserProfile(data.user.id);
+          console.log('✅ User profile created successfully');
+        } catch (profileError) {
+          console.error('⚠️ Failed to create user profile:', profileError);
+          // Don't fail signup if profile creation fails, user can still continue
+        }
+      }
+
+      setState(prev => ({ ...prev, loading: false }));
+      
+      if (data.user && !data.session) {
+        toast({
+          title: "ইমেইল যাচাই করুন",
+          description: "আপনার ইমেইলে একটি যাচাইকরণ লিঙ্ক পাঠানো হয়েছে",
+        });
+      } else {
+        toast({
+          title: "সফলভাবে নিবন্ধন হয়েছে",
+          description: "আপনার আরবি শেখার যাত্রা শুরু করুন",
+        });
+      }
+
+      return { error: null };
+    } catch (err) {
+      const authError = err as AuthError;
+      setState(prev => ({ ...prev, loading: false, error: authError }));
+      return { error: authError };
     }
-
-    setState(prev => ({ ...prev, loading: false }));
-    
-    if (data.user && !data.session) {
-      toast({
-        title: "ইমেইল যাচাই করুন",
-        description: "আপনার ইমেইলে একটি যাচাইকরণ লিঙ্ক পাঠানো হয়েছে",
-      });
-    } else {
-      toast({
-        title: "সফলভাবে নিবন্ধন হয়েছে",
-        description: "আপনার আরবি শেখার যাত্রা শুরু করুন",
-      });
-    }
-
-    return { error: null };
   };
 
   // Sign out function with complete cleanup
