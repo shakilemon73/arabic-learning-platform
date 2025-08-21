@@ -30,38 +30,62 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { user, profile: userProfile, loading: authLoading } = useAuth();
 
-  // Fetch real user data
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['/api/user-profile', user?.id],
-    queryFn: () => getUserProfile(user!.id),
+  // Fetch real user data with proper error handling
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User ID required');
+      return await getUserProfile(user.id);
+    },
     enabled: !!user?.id,
+    initialData: null,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 
-  const { data: attendance, isLoading: attendanceLoading } = useQuery({
-    queryKey: ['/api/user-attendance', user?.id],
-    queryFn: () => getUserAttendance(user!.id),
+  const { data: attendance, isLoading: attendanceLoading, error: attendanceError } = useQuery({
+    queryKey: ['user-attendance', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User ID required');
+      return await getUserAttendance(user.id);
+    },
     enabled: !!user?.id,
+    initialData: [],
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 
-  const { data: upcomingClasses, isLoading: classesLoading } = useQuery({
-    queryKey: ['/api/live-classes'],
-    queryFn: () => getLiveClasses(),
+  const { data: upcomingClasses, isLoading: classesLoading, error: classesError } = useQuery({
+    queryKey: ['live-classes'],
+    queryFn: async () => await getLiveClasses(),
+    initialData: [],
+    staleTime: 1000 * 60 * 2, // 2 minutes for live data
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
   
   // Debug: Show what classes are loaded from your Supabase
   console.log('🏠 Dashboard classes from Supabase:', upcomingClasses);
 
-  const isLoading = authLoading || profileLoading || attendanceLoading || classesLoading;
+  // Show errors if any critical data failed to load
+  if (profileError || attendanceError || classesError) {
+    console.error('Dashboard data errors:', { profileError, attendanceError, classesError });
+  }
 
-  // Use real data or fallbacks
+  const isLoading = authLoading || (profileLoading && !profile) || (attendanceLoading && !attendance) || (classesLoading && !upcomingClasses);
+
+  // Use real data with proper fallbacks
   const displayProfile = profile || userProfile || {
-    enrollment_status: "pending",
-    payment_status: "pending", 
+    enrollment_status: "pending" as const,
+    payment_status: "pending" as const,
     course_progress: 0,
     classes_attended: 0,
     certificate_score: 0,
     first_name: "",
-    last_name: ""
+    last_name: "",
+    role: "student" as const
   };
 
   const displayUser = user || { 
@@ -69,7 +93,7 @@ export default function Dashboard() {
     user_metadata: { first_name: "ব্যবহারকারী", last_name: "" }
   };
 
-  // Handle loading states
+  // Handle loading states with timeout
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -93,9 +117,9 @@ export default function Dashboard() {
     );
   }
 
-  // Get recent attendance with class details
-  const recentAttendance = (attendance || []).slice(0, 5);
-  const upcomingClassesList = (upcomingClasses || []).slice(0, 3);
+  // Get recent attendance with class details (with safety checks)
+  const recentAttendance = Array.isArray(attendance) ? attendance.slice(0, 5) : [];
+  const upcomingClassesList = Array.isArray(upcomingClasses) ? upcomingClasses.slice(0, 3) : [];
 
   const enrollmentStatus = displayProfile?.enrollment_status;
   const paymentStatus = displayProfile?.payment_status;
