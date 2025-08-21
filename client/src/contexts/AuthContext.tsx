@@ -92,20 +92,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
-        console.error('⚠️ Error fetching user profile:', error);
+        console.error('⚠️ Error fetching user profile:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         // If profile doesn't exist, create a default one
         if (error.code === 'PGRST116') {
+          console.log('🔄 Profile not found, creating new profile...');
           return await createUserProfile(userId);
         }
         // Return default profile to allow user to continue
+        console.log('🔄 Using default profile due to error...');
         return await createDefaultProfile(userId);
       }
 
-      console.log('✅ User profile fetched successfully');
+      console.log('✅ User profile fetched successfully:', data);
       return data as UserProfile;
     } catch (error) {
-      console.error('❌ Error fetching user profile:', error);
+      console.error('❌ Error fetching user profile:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        userId
+      });
       // Return default profile to allow user to continue
+      console.log('🔄 Using default profile due to catch error...');
       return await createDefaultProfile(userId);
     }
   };
