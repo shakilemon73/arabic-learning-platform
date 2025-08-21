@@ -42,7 +42,6 @@ export interface LiveClass {
   meeting_url: string | null;
   recording_url: string | null;
   max_participants: number;
-  current_participants: number;
   is_active: boolean;
   created_at: string;
 }

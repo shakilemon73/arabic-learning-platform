@@ -95,7 +95,6 @@ export const getLiveClasses = async (): Promise<LiveClassWithDetails[]> => {
         meeting_url,
         recording_url,
         max_participants,
-        current_participants,
         is_active,
         created_at,
         course_modules (
@@ -171,14 +170,11 @@ export const updateClassParticipants = async (classId: string, increment: boolea
 };
 
 // Admin class management functions
-export const createLiveClass = async (classData: Omit<LiveClass, 'id' | 'created_at' | 'current_participants'>) => {
+export const createLiveClass = async (classData: Omit<LiveClass, 'id' | 'created_at'>) => {
   try {
     const { data, error } = await supabase
       .from('live_classes')
-      .insert({
-        ...classData,
-        current_participants: 0
-      })
+      .insert(classData)
       .select()
       .single();
       
