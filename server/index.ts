@@ -1,58 +1,48 @@
 #!/usr/bin/env tsx
-import { exec } from 'child_process';
-import { VideoWebSocketServer } from './websocket-server';
+import { createServer } from 'http';
+import express from 'express';
+import { WebRTCSignalingServer } from './webrtc-signaling';
 
-console.log("🚀 Starting Arabic Learning Platform with Supabase + WebSocket backend...");
-console.log("📱 Using Vite frontend with dedicated WebSocket server");
-console.log("🔄 Supabase for data storage + WebSocket for real-time communication");
+console.log("🚀 Starting Arabic Learning Platform with WebRTC signaling...");
 
-// Start WebSocket server for video conferencing
-const wsServer = new VideoWebSocketServer(8080);
+// Create Express app
+const app = express();
 
-// Start Vite dev server
-const viteProcess = exec('npx vite --host 0.0.0.0 --port 5000', (error, stdout, stderr) => {
-  if (error) {
-    console.error(`Vite process error: ${error}`);
-    return;
-  }
-  if (stdout) console.log(`Vite stdout: ${stdout}`);
-  if (stderr) console.error(`Vite stderr: ${stderr}`);
+// Basic middleware
+app.use(express.json());
+app.use(express.static('dist/public'));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-viteProcess.stdout?.on('data', (data) => {
-  process.stdout.write(data);
+// Create HTTP server
+const server = createServer(app);
+
+// Initialize WebRTC signaling server
+const webrtcServer = new WebRTCSignalingServer(server);
+
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🔗 WebRTC signaling available at ws://localhost:${PORT}/webrtc-signaling`);
 });
 
-viteProcess.stderr?.on('data', (data) => {
-  process.stderr.write(data);
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down server...');
+  server.close(() => {
+    console.log('✅ Server shutdown complete');
+    process.exit(0);
+  });
 });
 
-viteProcess.on('close', (code) => {
-  console.log(`Vite process exited with code ${code}`);
-  process.exit(code || 0);
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Shutting down server...');
+  server.close(() => {
+    console.log('✅ Server shutdown complete');
+    process.exit(0);
+  });
 });
-
-// Initialize WebSocket server
-wsServer.start().then(() => {
-  console.log('✅ Video conferencing infrastructure ready');
-}).catch(error => {
-  console.error('❌ Failed to start WebSocket server:', error);
-});
-
-// Graceful shutdown handling
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down...');
-  
-  await wsServer.shutdown();
-  viteProcess.kill('SIGINT');
-});
-
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down...');
-  
-  await wsServer.shutdown();
-  viteProcess.kill('SIGTERM');
-});
-
-// Prevent the process from exiting
-setInterval(() => {}, 1000);
