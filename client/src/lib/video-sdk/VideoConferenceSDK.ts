@@ -1,9 +1,14 @@
 /**
  * Production Video Conference SDK - Complete Zoom-like Platform
  * Real multi-user video conferencing with screen sharing and enterprise features
+ * Enhanced with enterprise-grade core modules for professional video conferencing
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { EventEmitter } from './core/EventEmitter';
+import { MediaManager, MediaConstraints } from './core/MediaManager';
+import { SignalingManager } from './core/SignalingManager';
+import { PeerConnectionManager } from './core/PeerConnectionManager';
 
 interface ConferenceConfig {
   supabaseUrl: string;
@@ -32,7 +37,7 @@ interface MediaStreamData {
   type: 'camera' | 'screen';
 }
 
-export class VideoConferenceSDK {
+export class VideoConferenceSDK extends EventEmitter {
   private supabase: SupabaseClient;
   private config: ConferenceConfig;
   private roomId: string | null = null;
@@ -40,6 +45,11 @@ export class VideoConferenceSDK {
   private displayName: string | null = null;
   private isConnected = false;
   private channel: any = null;
+  
+  // Enterprise-grade core modules
+  private mediaManager: MediaManager;
+  private signalingManager: SignalingManager;
+  private peerConnectionManager: PeerConnectionManager;
   
   // Media management
   private localStream: MediaStream | null = null;
@@ -53,11 +63,10 @@ export class VideoConferenceSDK {
   private isAudioEnabled = true;
   private isScreenSharing = false;
   private userRole: 'host' | 'moderator' | 'participant' = 'participant';
-  
-  // Event listeners
-  private eventListeners = new Map<string, Function[]>();
 
   constructor(config: ConferenceConfig) {
+    super();
+    
     this.config = {
       maxParticipants: 100,
       enableSFU: true,
@@ -77,23 +86,98 @@ export class VideoConferenceSDK {
       },
     });
 
-    console.log('🚀 VideoConferenceSDK initialized');
+    // Initialize enterprise-grade core modules
+    this.mediaManager = new MediaManager(this.config);
+    this.signalingManager = new SignalingManager(this.supabase);
+    this.peerConnectionManager = new PeerConnectionManager(this.config);
+
+    // Setup inter-module communication
+    this.setupModuleEventHandlers();
+
+    console.log('🚀 VideoConferenceSDK initialized with enterprise modules');
   }
 
   /**
-   * Event system
+   * Setup communication between enterprise modules
    */
-  on(event: string, callback: Function): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, []);
-    }
-    this.eventListeners.get(event)!.push(callback);
+  private setupModuleEventHandlers(): void {
+    // Media Manager events
+    this.mediaManager.on('stream-acquired', (data: any) => {
+      this.localStream = data.stream;
+      this.emit('local-stream', data);
+    });
+
+    this.mediaManager.on('video-toggled', (data: any) => {
+      this.isVideoEnabled = data.enabled;
+      this.emit('video-toggled', data);
+    });
+
+    this.mediaManager.on('audio-toggled', (data: any) => {
+      this.isAudioEnabled = data.enabled;
+      this.emit('audio-toggled', data);
+    });
+
+    this.mediaManager.on('error', (data: any) => {
+      this.emit('error', data);
+    });
+
+    // Signaling Manager events
+    this.signalingManager.on('connected', (data: any) => {
+      this.isConnected = true;
+      this.emit('connected', data);
+    });
+
+    this.signalingManager.on('disconnected', () => {
+      this.isConnected = false;
+      this.emit('disconnected');
+    });
+
+    this.signalingManager.on('user-joined', (data: any) => {
+      this.handleParticipantJoined(data);
+    });
+
+    this.signalingManager.on('user-left', (data: any) => {
+      this.handleParticipantLeft(data.userId);
+    });
+
+    this.signalingManager.on('signaling-message', (data: any) => {
+      this.handleWebRTCSignalingMessage(data);
+    });
+
+    this.signalingManager.on('error', (data: any) => {
+      this.emit('error', data);
+    });
+
+    // Peer Connection Manager events
+    this.peerConnectionManager.on('remote-stream', (data: any) => {
+      this.remoteStreams.set(data.participantId, data.stream);
+      this.emit('remote-stream', data);
+    });
+
+    this.peerConnectionManager.on('connection-state-change', (data: any) => {
+      const participant = this.participants.get(data.participantId);
+      if (participant) {
+        participant.connectionQuality = this.mapConnectionStateToQuality(data.state);
+        this.emit('participant-updated', { participant });
+      }
+    });
+
+    this.peerConnectionManager.on('error', (data: any) => {
+      this.emit('error', data);
+    });
   }
 
-  private emit(event: string, data?: any): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach(callback => callback(data));
+  /**
+   * Map WebRTC connection state to quality indicator
+   */
+  private mapConnectionStateToQuality(state: string): 'excellent' | 'good' | 'poor' | 'disconnected' {
+    switch (state) {
+      case 'connected': return 'excellent';
+      case 'connecting': return 'good';
+      case 'disconnected': return 'poor';
+      case 'failed':
+      case 'closed': return 'disconnected';
+      default: return 'good';
     }
   }
 
@@ -115,11 +199,16 @@ export class VideoConferenceSDK {
       // Check if room exists, create if doesn't exist and user is admin
       await this.ensureRoomExists(role);
 
-      // Initialize local media
-      await this.initializeLocalMedia();
+      // Initialize local media using enterprise MediaManager
+      await this.mediaManager.initialize();
+      const stream = await this.mediaManager.getUserMedia({
+        video: { width: 1280, height: 720, frameRate: 30, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      this.localStream = stream;
 
-      // Setup real-time signaling
-      await this.setupSignaling(role);
+      // Setup real-time signaling using enterprise SignalingManager
+      await this.signalingManager.connect(roomId, userId);
 
       // Add participant to database
       await this.addParticipantToDatabase(role);
@@ -137,7 +226,78 @@ export class VideoConferenceSDK {
   }
 
   /**
-   * Initialize local camera and microphone with proper error handling
+   * Handle WebRTC signaling messages
+   */
+  private async handleWebRTCSignalingMessage(message: any): Promise<void> {
+    try {
+      const { type, fromUserId, payload } = message;
+      
+      switch (type) {
+        case 'offer':
+          await this.handleWebRTCOffer(fromUserId, payload);
+          break;
+        case 'answer':
+          await this.handleWebRTCAnswer(fromUserId, payload);
+          break;
+        case 'ice-candidate':
+          await this.handleWebRTCIceCandidate(fromUserId, payload);
+          break;
+        default:
+          console.warn('Unknown signaling message type:', type);
+      }
+    } catch (error) {
+      console.error('Error handling signaling message:', error);
+      this.emit('error', { message: 'Signaling error: ' + (error as Error).message });
+    }
+  }
+
+  /**
+   * Handle WebRTC offer from remote peer
+   */
+  private async handleWebRTCOffer(fromUserId: string, offer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      const peerConnection = await this.peerConnectionManager.createPeerConnection(fromUserId, this.localStream!);
+      await peerConnection.setRemoteDescription(offer);
+      
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      
+      await this.signalingManager.sendAnswer(fromUserId, answer);
+    } catch (error) {
+      console.error('Error handling WebRTC offer:', error);
+    }
+  }
+
+  /**
+   * Handle WebRTC answer from remote peer
+   */
+  private async handleWebRTCAnswer(fromUserId: string, answer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      const peerConnection = this.peerConnectionManager.getPeerConnection(fromUserId);
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(answer);
+      }
+    } catch (error) {
+      console.error('Error handling WebRTC answer:', error);
+    }
+  }
+
+  /**
+   * Handle ICE candidate from remote peer
+   */
+  private async handleWebRTCIceCandidate(fromUserId: string, candidate: RTCIceCandidateInit): Promise<void> {
+    try {
+      const peerConnection = this.peerConnectionManager.getPeerConnection(fromUserId);
+      if (peerConnection) {
+        await peerConnection.addIceCandidate(candidate);
+      }
+    } catch (error) {
+      console.error('Error handling ICE candidate:', error);
+    }
+  }
+
+  /**
+   * Initialize local camera and microphone with proper error handling (Legacy method)
    */
   private async initializeLocalMedia(): Promise<void> {
     try {
@@ -521,76 +681,7 @@ export class VideoConferenceSDK {
     }
   }
 
-  /**
-   * Handle received WebRTC offer
-   */
-  private async handleWebRTCOffer(payload: any): Promise<void> {
-    if (!this.userId || payload.targetId !== this.userId) return;
 
-    console.log('📞 Received WebRTC offer from:', payload.fromId);
-
-    let pc = this.peerConnections.get(payload.fromId);
-    if (!pc) {
-      pc = await this.createPeerConnection(payload.fromId);
-    }
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-      
-      const answer = await pc.createAnswer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
-      
-      await pc.setLocalDescription(answer);
-      
-      await this.sendSignalingMessage('webrtc-answer', {
-        targetId: payload.fromId,
-        answer: answer
-      });
-      
-      console.log('✅ WebRTC answer sent to:', payload.fromId);
-      
-    } catch (error) {
-      console.error('❌ Failed to handle WebRTC offer:', error);
-    }
-  }
-
-  /**
-   * Handle received WebRTC answer
-   */
-  private async handleWebRTCAnswer(payload: any): Promise<void> {
-    if (!this.userId || payload.targetId !== this.userId) return;
-
-    console.log('✅ Received WebRTC answer from:', payload.fromId);
-
-    const pc = this.peerConnections.get(payload.fromId);
-    if (!pc) return;
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-      console.log('🎯 WebRTC connection established with:', payload.fromId);
-    } catch (error) {
-      console.error('❌ Failed to handle WebRTC answer:', error);
-    }
-  }
-
-  /**
-   * Handle received ICE candidate
-   */
-  private async handleWebRTCIceCandidate(payload: any): Promise<void> {
-    if (!this.userId || payload.targetId !== this.userId) return;
-
-    const pc = this.peerConnections.get(payload.fromId);
-    if (!pc) return;
-
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      console.log('✅ ICE candidate added for:', payload.fromId);
-    } catch (error) {
-      console.error('❌ Failed to handle ICE candidate:', error);
-    }
-  }
 
   /**
    * Send signaling message via Supabase
@@ -613,47 +704,43 @@ export class VideoConferenceSDK {
   }
 
   /**
-   * Toggle local video on/off
+   * Toggle local video on/off using enterprise MediaManager
    */
   async toggleVideo(): Promise<void> {
     if (!this.localStream) return;
 
-    const videoTrack = this.localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      this.isVideoEnabled = videoTrack.enabled;
+    // Use enterprise MediaManager for video toggling
+    const newState = await this.mediaManager.toggleVideo(this.localStream, !this.isVideoEnabled);
+    this.isVideoEnabled = newState;
       
-      // Notify other participants
-      await this.sendSignalingMessage('media-toggle', {
-        type: 'video',
-        enabled: this.isVideoEnabled
-      });
+    // Notify other participants
+    await this.sendSignalingMessage('media-toggle', {
+      type: 'video',
+      enabled: this.isVideoEnabled
+    });
       
-      this.emit('video-toggled', { enabled: this.isVideoEnabled });
-      console.log('📹 Video toggled:', this.isVideoEnabled ? 'ON' : 'OFF');
-    }
+    this.emit('video-toggled', { enabled: this.isVideoEnabled });
+    console.log('📹 Video toggled:', this.isVideoEnabled ? 'ON' : 'OFF');
   }
 
   /**
-   * Toggle local audio on/off
+   * Toggle local audio on/off using enterprise MediaManager
    */
   async toggleAudio(): Promise<void> {
     if (!this.localStream) return;
 
-    const audioTrack = this.localStream.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      this.isAudioEnabled = audioTrack.enabled;
+    // Use enterprise MediaManager for audio toggling
+    const newState = await this.mediaManager.toggleAudio(this.localStream, !this.isAudioEnabled);
+    this.isAudioEnabled = newState;
       
-      // Notify other participants
-      await this.sendSignalingMessage('media-toggle', {
-        type: 'audio',
-        enabled: this.isAudioEnabled
-      });
+    // Notify other participants
+    await this.sendSignalingMessage('media-toggle', {
+      type: 'audio',
+      enabled: this.isAudioEnabled
+    });
       
-      this.emit('audio-toggled', { enabled: this.isAudioEnabled });
-      console.log('🎤 Audio toggled:', this.isAudioEnabled ? 'ON' : 'OFF');
-    }
+    this.emit('audio-toggled', { enabled: this.isAudioEnabled });
+    console.log('🎤 Audio toggled:', this.isAudioEnabled ? 'ON' : 'OFF');
   }
 
   /**
