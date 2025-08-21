@@ -1,7 +1,7 @@
 import { EventEmitter } from '../core/EventEmitter';
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { SFUManager, SFUConfig } from './SFUManager';
-import { AdaptiveBitrateManager } from './AdaptiveBitrateManager';
+import { AdaptiveBitrateManager } from '../core/AdaptiveBitrateManager';
 import { AudioProcessingManager, AudioProcessingConfig } from './AudioProcessingManager';
 import { NetworkResilienceManager } from './NetworkResilienceManager';
 import { RecordingManager, RecordingConfig } from './RecordingManager';
