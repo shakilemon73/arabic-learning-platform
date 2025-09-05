@@ -323,8 +323,14 @@ export const MultiUserVideoConference: React.FC<MultiUserVideoConferenceProps> =
     try {
       console.log(`🚪 Joining room: ${roomId} as ${userRole}`);
       
-      // Initialize local media stream first
-      await initializeLocalStream();
+      // Initialize local media stream first (with graceful fallback)
+      try {
+        await initializeLocalStream();
+        console.log('✅ Media stream initialized successfully');
+      } catch (mediaError) {
+        console.warn('⚠️ Media access failed, continuing with audio-only mode:', mediaError);
+        // Continue without throwing - allow text/audio-only participation
+      }
       
       // Create WebSocket connection for real-time signaling
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -354,6 +360,10 @@ export const MultiUserVideoConference: React.FC<MultiUserVideoConferenceProps> =
           
           switch (message.type) {
             case 'room-joined':
+              // Successfully joined the room - update connection state
+              setIsConnected(true);
+              console.log('✅ Successfully joined video conference room');
+              
               // Update participants list with existing participants
               const existingParticipants: Participant[] = message.participants.map((p: any) => ({
                 id: p.id,
