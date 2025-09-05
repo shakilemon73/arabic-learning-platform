@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5000,
-    allowedHosts: "f54fb581-13a1-4bc4-9acb-d70ee1987afa-00-ogbwgh47k69l.spock.replit.dev", // This fixes the host blocking issue permanently
+    allowedHosts: ["f54fb581-13a1-4bc4-9acb-d70ee1987afa-00-ogbwgh47k69l.spock.replit.dev"], // ✅ Correct - array
     fs: {
       strict: true,
       deny: ["**/.*"],
