@@ -309,7 +309,7 @@ export default function LiveClassPage() {
               <TabsContent value="homework" className="h-full mt-0">
                 <div className="bg-white rounded-lg border h-full p-6">
                   {selectedClass?.id && (
-                    <HomeworkSubmissions sessionId={selectedClass.id} />
+                    <HomeworkSubmissions classId={selectedClass.id} />
                   )}
                 </div>
               </TabsContent>

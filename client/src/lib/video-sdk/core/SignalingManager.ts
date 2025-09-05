@@ -40,64 +40,368 @@ export class SignalingManager extends EventEmitter {
   private userId: string | null = null;
   private isConnected = false;
 
+  // Production enhancements
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private messageQueue: any[] = [];
+  private lastMessageTime = 0;
+  private messageRateLimit = 100; // Max messages per second
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private connectionMetrics = {
+    messagesReceived: 0,
+    messagesSent: 0,
+    lastHeartbeat: 0,
+    connectionQuality: 'good' as 'excellent' | 'good' | 'poor'
+  };
+
   constructor(supabase: SupabaseClient) {
     super();
     this.supabase = supabase;
   }
 
   /**
-   * Connect to signaling channel for a room
+   * Connect to signaling channel with production-grade reliability
    */
   async connect(roomId: string, userId: string): Promise<void> {
     try {
+      console.log('🔗 Connecting to signaling channel...', { roomId, userId });
+      
+      // Validate inputs
+      if (!roomId || !userId) {
+        throw new Error('Room ID and User ID are required');
+      }
+
       this.roomId = roomId;
       this.userId = userId;
+      this.reconnectAttempts = 0;
 
-      // Create real-time channel for this room
-      this.channel = this.supabase.channel(`video-room-${roomId}`, {
-        config: {
-          broadcast: { self: true }
-        }
-      });
-
-      // Set up real-time event listeners
-      this.channel
-        .on('broadcast', { event: 'signaling' }, (payload) => {
-          this.handleSignalingMessage(payload.payload as SignalingMessage);
-        })
-        .on('presence', { event: 'sync' }, () => {
-          const users = this.channel!.presenceState();
-          this.emit('users-changed', { users });
-        })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          this.emit('user-joined', { userId: key, presence: newPresences[0] });
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-          this.emit('user-left', { userId: key, presence: leftPresences[0] });
-        });
-
-      // Subscribe to the channel
-      const response = await this.channel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          // Track user presence
-          await this.channel!.track({
-            userId: this.userId,
-            online_at: new Date().toISOString()
-          });
-          
-          this.isConnected = true;
-          this.emit('connected', { roomId, userId });
-          console.log('SignalingManager: Successfully connected to real-time channel');
-        }
-      });
-
-      // Response handling - channel subscription is handled in the callback
+      await this.establishConnection();
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown signaling error';
-      this.emit('error', { error: errorMessage });
+      console.error('❌ SignalingManager connection failed:', errorMessage);
+      this.emit('error', { error: errorMessage, context: 'connect' });
       throw error;
     }
+  }
+
+  /**
+   * Establish real-time connection with retry logic
+   */
+  private async establishConnection(): Promise<void> {
+    try {
+      // Clean up any existing connection
+      if (this.channel) {
+        await this.channel.unsubscribe();
+        this.channel = null;
+      }
+
+      // Create real-time channel for this room with enhanced config
+      this.channel = this.supabase.channel(`video-room-${this.roomId}`, {
+        config: {
+          broadcast: { 
+            self: true,
+            ack: true // Request acknowledgment for reliability
+          },
+          presence: {
+            key: this.userId || undefined
+          }
+        }
+      });
+
+      // Set up comprehensive event listeners
+      this.setupChannelEventListeners();
+
+      // Subscribe with connection monitoring
+      await this.subscribeWithRetry();
+
+    } catch (error) {
+      console.error('❌ Failed to establish connection:', error);
+      await this.handleReconnection(error as Error);
+    }
+  }
+
+  /**
+   * Setup channel event listeners with production monitoring
+   */
+  private setupChannelEventListeners(): void {
+    if (!this.channel) return;
+
+    this.channel
+      // Signaling messages
+      .on('broadcast', { event: 'signaling' }, (payload) => {
+        this.connectionMetrics.messagesReceived++;
+        
+        // Validate message before processing
+        if (this.validateSignalingMessage(payload.payload)) {
+          this.handleSignalingMessage(payload.payload as SignalingMessage);
+        } else {
+          console.warn('⚠️ Invalid signaling message received:', payload);
+        }
+      })
+      
+      // Presence events for participant management
+      .on('presence', { event: 'sync' }, () => {
+        const users = this.channel!.presenceState();
+        console.log('👥 Presence sync:', Object.keys(users).length, 'participants');
+        this.emit('users-changed', { users });
+        this.updateConnectionQuality('good');
+      })
+      
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('👤 User joined presence:', key);
+        this.emit('user-joined', { userId: key, presence: newPresences[0] });
+      })
+      
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('👋 User left presence:', key);
+        this.emit('user-left', { userId: key, presence: leftPresences[0] });
+      })
+
+      // System events for connection monitoring  
+      .on('system', {}, (payload) => {
+        console.log('📡 System event:', payload);
+        if (payload.extension === 'postgres_changes') {
+          // Handle database changes if needed
+        }
+      });
+  }
+
+  /**
+   * Subscribe with retry logic and connection monitoring
+   */
+  private async subscribeWithRetry(): Promise<void> {
+    if (!this.channel) throw new Error('Channel not initialized');
+
+    const subscribePromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Subscription timeout after 10 seconds'));
+      }, 10000);
+
+      this.channel!.subscribe(async (status, err) => {
+        clearTimeout(timeout);
+
+        if (err) {
+          console.error('❌ Channel subscription error:', err);
+          reject(err);
+          return;
+        }
+
+        switch (status) {
+          case 'SUBSCRIBED':
+            try {
+              // Track user presence with detailed info
+              await this.channel!.track({
+                userId: this.userId,
+                online_at: new Date().toISOString(),
+                browser: navigator.userAgent.split(' ')[0],
+                connection_quality: this.connectionMetrics.connectionQuality
+              });
+              
+              this.isConnected = true;
+              this.reconnectAttempts = 0;
+              
+              // Start connection monitoring
+              this.startHeartbeat();
+              
+              // Process any queued messages
+              await this.processMessageQueue();
+              
+              this.emit('connected', { roomId: this.roomId, userId: this.userId });
+              console.log('✅ SignalingManager: Successfully connected to real-time channel');
+              resolve();
+              
+            } catch (trackError) {
+              console.error('❌ Failed to track presence:', trackError);
+              reject(trackError);
+            }
+            break;
+            
+          case 'CHANNEL_ERROR':
+            console.error('❌ Channel error during subscription');
+            reject(new Error('Channel subscription failed'));
+            break;
+            
+          case 'TIMED_OUT':
+            console.error('⏰ Channel subscription timed out');
+            reject(new Error('Channel subscription timed out'));
+            break;
+            
+          case 'CLOSED':
+            console.log('🔌 Channel subscription closed');
+            this.handleConnectionLost();
+            break;
+        }
+      });
+    });
+
+    await subscribePromise;
+  }
+
+  /**
+   * Handle reconnection with exponential backoff
+   */
+  private async handleReconnection(error: Error): Promise<void> {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached');
+      this.emit('connection-failed', { error: 'Max reconnection attempts exceeded' });
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    
+    console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
+
+    setTimeout(async () => {
+      try {
+        await this.establishConnection();
+      } catch (retryError) {
+        await this.handleReconnection(retryError as Error);
+      }
+    }, delay);
+  }
+
+  /**
+   * Handle connection lost scenario
+   */
+  private handleConnectionLost(): void {
+    this.isConnected = false;
+    this.stopHeartbeat();
+    this.updateConnectionQuality('poor');
+    this.emit('connection-lost');
+    
+    // Attempt automatic reconnection
+    this.handleReconnection(new Error('Connection lost'));
+  }
+
+  /**
+   * Start connection heartbeat monitoring
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // Clear any existing interval
+    
+    this.heartbeatInterval = setInterval(() => {
+      this.connectionMetrics.lastHeartbeat = Date.now();
+      
+      // Send ping to check connection
+      this.sendHeartbeat().catch((error) => {
+        console.warn('⚠️ Heartbeat failed:', error);
+        this.updateConnectionQuality('poor');
+      });
+    }, 30000); // Every 30 seconds
+  }
+
+  /**
+   * Stop heartbeat monitoring
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /**
+   * Send heartbeat ping
+   */
+  private async sendHeartbeat(): Promise<void> {
+    if (!this.channel || !this.isConnected) return;
+
+    try {
+      await this.channel.send({
+        type: 'broadcast',
+        event: 'heartbeat',
+        payload: {
+          userId: this.userId,
+          timestamp: Date.now()
+        }
+      });
+      this.updateConnectionQuality('good');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Update connection quality metrics
+   */
+  private updateConnectionQuality(quality: 'excellent' | 'good' | 'poor'): void {
+    if (this.connectionMetrics.connectionQuality !== quality) {
+      this.connectionMetrics.connectionQuality = quality;
+      this.emit('connection-quality-changed', { quality });
+    }
+  }
+
+  /**
+   * Validate signaling message structure
+   */
+  private validateSignalingMessage(message: any): boolean {
+    if (!message || typeof message !== 'object') return false;
+    
+    const requiredFields = ['type', 'fromUserId', 'roomId', 'timestamp'];
+    return requiredFields.every(field => field in message);
+  }
+
+  /**
+   * Process queued messages after reconnection
+   */
+  private async processMessageQueue(): Promise<void> {
+    if (this.messageQueue.length === 0) return;
+
+    console.log(`📤 Processing ${this.messageQueue.length} queued messages`);
+    
+    const queue = [...this.messageQueue];
+    this.messageQueue = [];
+
+    for (const message of queue) {
+      try {
+        await this.sendSignalingMessage(message);
+        this.connectionMetrics.messagesSent++;
+      } catch (error) {
+        console.error('❌ Failed to send queued message:', error);
+        // Re-queue failed message for retry
+        this.messageQueue.push(message);
+      }
+    }
+  }
+
+  /**
+   * Queue message when disconnected (with rate limiting)
+   */
+  private queueMessage(message: SignalingMessage): boolean {
+    // Rate limiting check
+    const now = Date.now();
+    if (now - this.lastMessageTime < this.messageRateLimit) {
+      console.warn('⚠️ Message rate limit exceeded, dropping message');
+      return false;
+    }
+    
+    this.lastMessageTime = now;
+    
+    // Limit queue size to prevent memory issues
+    if (this.messageQueue.length >= 50) {
+      console.warn('⚠️ Message queue full, dropping oldest message');
+      this.messageQueue.shift();
+    }
+    
+    this.messageQueue.push(message);
+    console.log(`📥 Queued message (${this.messageQueue.length} total)`);
+    return true;
+  }
+
+  /**
+   * Get connection metrics for monitoring
+   */
+  getConnectionMetrics(): any {
+    return {
+      ...this.connectionMetrics,
+      queueSize: this.messageQueue.length,
+      isConnected: this.isConnected,
+      reconnectAttempts: this.reconnectAttempts
+    };
   }
 
   /**

@@ -31,6 +31,20 @@ export class PeerConnectionManager extends EventEmitter {
   private statsInterval: NodeJS.Timeout | null = null;
   private rtcConfiguration: RTCConfiguration;
 
+  // Production enhancements
+  private connectionAttempts: Map<string, number> = new Map();
+  private maxConnectionAttempts = 3;
+  private connectionTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private connectionTimeout = 30000; // 30 seconds
+  private lastStatsUpdate: Map<string, number> = new Map();
+  private performanceMetrics = {
+    totalConnections: 0,
+    successfulConnections: 0,
+    failedConnections: 0,
+    averageConnectionTime: 0,
+    dataChannelMessages: 0
+  };
+
   constructor(config: any) {
     super();
     this.config = config;
@@ -52,52 +66,140 @@ export class PeerConnectionManager extends EventEmitter {
   }
 
   /**
-   * Create real WebRTC peer connection
+   * Create production-grade WebRTC peer connection
    */
   async createPeerConnection(participantId: string, localStream?: MediaStream): Promise<RTCPeerConnection> {
     try {
-      if (this.peerConnections.has(participantId)) {
-        throw new Error(`Peer connection already exists for participant ${participantId}`);
+      console.log(`🔗 Creating peer connection for ${participantId}...`);
+      
+      // Validate inputs
+      if (!participantId) {
+        throw new Error('Participant ID is required');
       }
 
-      const peerConnection = new RTCPeerConnection(this.rtcConfiguration);
+      if (this.peerConnections.has(participantId)) {
+        console.warn(`⚠️ Peer connection already exists for ${participantId}, closing existing one`);
+        this.closePeerConnection(participantId);
+      }
+
+      // Track connection attempt
+      const attempts = this.connectionAttempts.get(participantId) || 0;
+      if (attempts >= this.maxConnectionAttempts) {
+        throw new Error(`Max connection attempts (${this.maxConnectionAttempts}) exceeded for ${participantId}`);
+      }
+      this.connectionAttempts.set(participantId, attempts + 1);
+
+      // Enhanced RTCPeerConnection configuration for production
+      const productionConfig: RTCConfiguration = {
+        ...this.rtcConfiguration,
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require',
+        iceTransportPolicy: 'all', // Allow both STUN and TURN
+      };
+
+      const connectionStartTime = Date.now();
+      const peerConnection = new RTCPeerConnection(productionConfig);
+
+      // Set connection timeout
+      this.setConnectionTimeout(participantId, connectionStartTime);
 
       // Add local stream tracks if provided
       if (localStream || this.localStream) {
         const stream = localStream || this.localStream!;
+        console.log(`📤 Adding ${stream.getTracks().length} local tracks to peer connection`);
+        
         stream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, stream);
+          try {
+            const sender = peerConnection.addTrack(track, stream);
+            console.log(`✅ Added ${track.kind} track (${track.label})`);
+            
+            // Set initial encoding parameters for video
+            if (track.kind === 'video' && sender.getParameters) {
+              const params = sender.getParameters();
+              if (params.encodings && params.encodings.length > 0) {
+                // Set reasonable defaults
+                params.encodings[0].maxBitrate = 1000000; // 1 Mbps
+                params.encodings[0].maxFramerate = 30;
+                sender.setParameters(params).catch(console.warn);
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Failed to add ${track.kind} track:`, error);
+          }
         });
       }
 
-      // Create data channel for chat and control messages
+      // Create data channel with enhanced options
       const dataChannel = peerConnection.createDataChannel('messages', {
-        ordered: true
+        ordered: true,
+        maxRetransmits: 3,
+        maxPacketLifeTime: 3000 // 3 seconds
       });
       this.dataChannels.set(participantId, dataChannel);
 
-      // Setup event handlers for real WebRTC
-      this.setupPeerConnectionEventHandlers(participantId, peerConnection);
+      // Setup comprehensive event handlers
+      this.setupProductionEventHandlers(participantId, peerConnection, connectionStartTime);
 
       // Store peer connection
       this.peerConnections.set(participantId, peerConnection);
+      this.performanceMetrics.totalConnections++;
 
-      console.log(`✅ Created real WebRTC peer connection for ${participantId}`);
-      this.emit('peer-connection-created', { participantId, peerConnection });
+      console.log(`✅ Created production WebRTC peer connection for ${participantId}`);
+      this.emit('peer-connection-created', { participantId, peerConnection, attempts });
       return peerConnection;
 
     } catch (error) {
+      this.performanceMetrics.failedConnections++;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`❌ Failed to create peer connection for ${participantId}:`, errorMessage);
-      this.emit('error', { error: errorMessage, participantId });
+      this.emit('error', { error: errorMessage, participantId, context: 'create-peer-connection' });
       throw error;
     }
   }
 
   /**
-   * Setup real WebRTC event handlers
+   * Set connection timeout to prevent hanging connections
    */
-  private setupPeerConnectionEventHandlers(participantId: string, peerConnection: RTCPeerConnection): void {
+  private setConnectionTimeout(participantId: string, startTime: number): void {
+    const timeout = setTimeout(() => {
+      const connectionTime = Date.now() - startTime;
+      console.warn(`⏰ Connection timeout for ${participantId} after ${connectionTime}ms`);
+      
+      this.handleConnectionTimeout(participantId);
+    }, this.connectionTimeout);
+
+    this.connectionTimeouts.set(participantId, timeout);
+  }
+
+  /**
+   * Handle connection timeout
+   */
+  private handleConnectionTimeout(participantId: string): void {
+    console.log(`🚫 Connection timeout for ${participantId}, attempting cleanup and retry...`);
+    
+    // Clean up timed out connection
+    this.closePeerConnection(participantId);
+    
+    // Emit timeout event for upper layers to handle
+    this.emit('connection-timeout', { participantId, timestamp: Date.now() });
+  }
+
+  /**
+   * Clear connection timeout when connection succeeds
+   */
+  private clearConnectionTimeout(participantId: string): void {
+    const timeout = this.connectionTimeouts.get(participantId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.connectionTimeouts.delete(participantId);
+    }
+  }
+
+  /**
+   * Setup production-grade WebRTC event handlers
+   */
+  private setupProductionEventHandlers(participantId: string, peerConnection: RTCPeerConnection, startTime: number): void {
     // Handle remote stream (real video/audio from participant)
     peerConnection.ontrack = (event) => {
       const [stream] = event.streams;
@@ -112,14 +214,39 @@ export class PeerConnectionManager extends EventEmitter {
       }
     };
 
-    // Handle connection state changes
+    // Handle connection state changes with production monitoring
     peerConnection.onconnectionstatechange = () => {
       const state = peerConnection.connectionState;
-      console.log(`🔗 Connection state changed for ${participantId}: ${state}`);
-      this.emit('connection-state-change', { participantId, state });
+      const connectionTime = Date.now() - startTime;
+      
+      console.log(`🔗 Connection state changed for ${participantId}: ${state} (${connectionTime}ms)`);
+      this.emit('connection-state-change', { participantId, state, connectionTime });
 
-      if (state === 'failed' || state === 'closed') {
-        this.handleConnectionFailure(participantId);
+      switch (state) {
+        case 'connected':
+          // Connection successful
+          this.clearConnectionTimeout(participantId);
+          this.connectionAttempts.delete(participantId);
+          this.performanceMetrics.successfulConnections++;
+          this.updateAverageConnectionTime(connectionTime);
+          console.log(`✅ WebRTC connection established with ${participantId} in ${connectionTime}ms`);
+          break;
+          
+        case 'failed':
+        case 'closed':
+          this.clearConnectionTimeout(participantId);
+          this.handleConnectionFailure(participantId);
+          break;
+          
+        case 'disconnected':
+          console.warn(`⚠️ Connection disconnected for ${participantId}, monitoring for recovery...`);
+          // Give it some time to reconnect before failing
+          setTimeout(() => {
+            if (peerConnection.connectionState === 'disconnected') {
+              this.handleConnectionFailure(participantId);
+            }
+          }, 5000);
+          break;
       }
     };
 
@@ -151,10 +278,15 @@ export class PeerConnectionManager extends EventEmitter {
     };
 
     dataChannel.onmessage = (event) => {
-      this.emit('data-channel-message', { 
-        participantId, 
-        message: JSON.parse(event.data) 
-      });
+      this.performanceMetrics.dataChannelMessages++;
+      
+      try {
+        const message = JSON.parse(event.data);
+        this.emit('data-channel-message', { participantId, message });
+      } catch (error) {
+        console.warn('⚠️ Failed to parse data channel message:', event.data);
+        this.emit('data-channel-error', { participantId, error: 'Invalid message format' });
+      }
     };
 
     dataChannel.onclose = () => {
@@ -565,5 +697,94 @@ export class PeerConnectionManager extends EventEmitter {
       console.error('❌ Failed to update stream quality:', errorMessage);
       this.emit('error', { error: errorMessage });
     }
+  }
+
+  /**
+   * Update average connection time metric
+   */
+  private updateAverageConnectionTime(connectionTime: number): void {
+    const currentAverage = this.performanceMetrics.averageConnectionTime;
+    const totalConnected = this.performanceMetrics.successfulConnections;
+    
+    if (totalConnected === 1) {
+      this.performanceMetrics.averageConnectionTime = connectionTime;
+    } else {
+      // Running average calculation
+      this.performanceMetrics.averageConnectionTime = 
+        ((currentAverage * (totalConnected - 1)) + connectionTime) / totalConnected;
+    }
+  }
+
+  /**
+   * Get comprehensive connection status for all participants
+   */
+  getConnectionStatus(): Map<string, any> {
+    const status = new Map();
+    
+    this.peerConnections.forEach((peerConnection, participantId) => {
+      status.set(participantId, {
+        connectionState: peerConnection.connectionState,
+        iceConnectionState: peerConnection.iceConnectionState,
+        iceGatheringState: peerConnection.iceGatheringState,
+        hasDataChannel: this.dataChannels.has(participantId),
+        dataChannelState: this.dataChannels.get(participantId)?.readyState,
+        attempts: this.connectionAttempts.get(participantId) || 0,
+        lastStatsUpdate: this.lastStatsUpdate.get(participantId) || 0
+      });
+    });
+    
+    return status;
+  }
+
+  /**
+   * Get performance metrics for monitoring
+   */
+  getPerformanceMetrics(): any {
+    return {
+      ...this.performanceMetrics,
+      activeConnections: this.peerConnections.size,
+      pendingCandidates: Array.from(this.pendingCandidates.entries()).map(([id, candidates]) => ({
+        participantId: id,
+        candidateCount: candidates.length
+      })),
+      connectionSuccessRate: this.performanceMetrics.totalConnections > 0 
+        ? (this.performanceMetrics.successfulConnections / this.performanceMetrics.totalConnections) * 100 
+        : 0
+    };
+  }
+
+  /**
+   * Retry failed connection with exponential backoff
+   */
+  async retryConnection(participantId: string, localStream?: MediaStream): Promise<RTCPeerConnection> {
+    const attempts = this.connectionAttempts.get(participantId) || 0;
+    const delay = Math.min(1000 * Math.pow(2, attempts), 10000); // Max 10 seconds
+    
+    console.log(`🔄 Retrying connection to ${participantId} (attempt ${attempts + 1}) in ${delay}ms`);
+    
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const peerConnection = await this.createPeerConnection(participantId, localStream);
+          resolve(peerConnection);
+        } catch (error) {
+          reject(error);
+        }
+      }, delay);
+    });
+  }
+
+  /**
+   * Force close and cleanup connection
+   */
+  forceCloseConnection(participantId: string, reason?: string): void {
+    console.log(`🔧 Force closing connection for ${participantId}${reason ? ` (${reason})` : ''}`);
+    
+    this.clearConnectionTimeout(participantId);
+    this.connectionAttempts.delete(participantId);
+    this.lastStatsUpdate.delete(participantId);
+    
+    this.closePeerConnection(participantId);
+    this.emit('connection-force-closed', { participantId, reason });
   }
 }
