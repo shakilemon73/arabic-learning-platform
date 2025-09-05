@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getLiveClasses, getLiveClassById } from '@/lib/api';
-import MultiUserVideoConference from '@/components/MultiUserVideoConference';
+import { EnterpriseVideoConference } from '@/components/EnterpriseVideoConference';
 import SupabaseLiveChat from '@/components/SupabaseLiveChat';
 import HomeworkSubmissions from '@/components/HomeworkSubmissions';
 
@@ -287,7 +287,7 @@ export default function LiveClassPage() {
 
               <TabsContent value="video" className="h-full mt-0">
                 {roomId && (
-                  <MultiUserVideoConference
+                  <EnterpriseVideoConference
                     roomId={roomId}
                     classId={selectedClass?.id}
                     onLeave={handleLeaveClass}
