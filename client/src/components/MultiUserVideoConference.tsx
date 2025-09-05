@@ -169,11 +169,19 @@ export const MultiUserVideoConference: React.FC<MultiUserVideoConferenceProps> =
       
       toast({
         title: "মিডিয়া অ্যাক্সেস ব্যর্থ",
-        description: userMessage,
+        description: userMessage + " - কেবল চ্যাট এবং অডিও দিয়ে অংশগ্রহণ করুন",
         variant: "destructive"
       });
       
-      throw error;
+      // Don't throw error - allow participation without media
+      // Create an empty stream for compatibility
+      const emptyStream = new MediaStream();
+      setLocalStream(emptyStream);
+      setIsVideoEnabled(false);
+      setIsAudioEnabled(false);
+      
+      console.log('⚠️ Continuing with audio-only/text-only mode');
+      return emptyStream;
     }
   }, [toast]);
 
