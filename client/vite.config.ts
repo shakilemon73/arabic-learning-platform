@@ -1,56 +1,52 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  const env = loadEnv(mode, process.cwd(), '')
-  
-  return {
-    plugins: [
-      react(),
+export default defineConfig({
+  plugins: [
+    react(),
+    runtimeErrorOverlay(),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
+  },
+  server: {
+    host: "0.0.0.0",
+    port: 5000,
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1", 
+      "*.replit.dev",
+      "*.replit.app",
+      "*.replit.co",
     ],
-    resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "src"),
-        "@shared": path.resolve(__dirname, "..", "shared"),
-        "@assets": path.resolve(__dirname, "..", "attached_assets"),
+    fs: {
+      strict: true,
+      deny: ["**/.*"],
+    },
+    proxy: {
+      // Proxy API requests to backend server
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
       },
-    },
-    build: {
-      outDir: "dist",
-      emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-            supabase: ['@supabase/supabase-js', '@supabase/auth-helpers-react']
-          }
-        }
+      // Proxy WebSocket connections to backend server
+      '/ws': {
+        target: 'ws://localhost:3000',
+        ws: true,
+        changeOrigin: true,
       }
-    },
-    base: "/",
-    define: {
-      global: "globalThis",
-      // Properly expose environment variables
-      __VITE_SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
-      __VITE_SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
-    },
-    server: {
-      host: "0.0.0.0",
-      port: 5000,
-      allowedHosts: [
-        "localhost",
-        "127.0.0.1", 
-        "*.replit.dev",
-        "*.replit.app",
-        "*.replit.co"
-      ],
-    },
-    // Ensure environment variables are properly loaded
-    envDir: '.',
-    envPrefix: ['VITE_'],
-  }
+    }
+  },
 });

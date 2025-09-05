@@ -29,11 +29,24 @@ export default defineConfig({
       "*.replit.dev",
       "*.replit.app",
       "*.replit.co",
-      "f54fb581-13a1-4bc4-9acb-d70ee1987afa-00-ogbwgh47k69l.spock.replit.dev"
     ],
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
+    proxy: {
+      // Proxy API requests to backend server
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy WebSocket connections to backend server
+      '/ws': {
+        target: 'ws://localhost:3000',
+        ws: true,
+        changeOrigin: true,
+      }
+    }
   },
 });
