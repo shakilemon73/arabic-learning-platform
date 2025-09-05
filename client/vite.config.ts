@@ -23,13 +23,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5000,
-    allowedHosts: [
-      "localhost",
-      "127.0.0.1", 
-      "*.replit.dev",
-      "*.replit.app",
-      "*.replit.co",
-    ],
+    allowedHosts: "all", // This fixes the host blocking issue permanently
     fs: {
       strict: true,
       deny: ["**/.*"],
