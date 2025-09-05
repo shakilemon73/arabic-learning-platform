@@ -29,7 +29,7 @@ export default defineConfig({
       "*.replit.dev",
       "*.replit.app",
       "*.replit.co",
-      "6c5b76b1-63e5-4970-991b-ef37fce06c89-00-ly864f7pneay.spock.replit.dev"
+      "69b2c5dc-7489-4560-843c-b1a57865313b-00-1m9a7ck52a1oo.spock.replit.dev"
     ],
     fs: {
       strict: true,
