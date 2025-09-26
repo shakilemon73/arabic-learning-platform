@@ -51,4 +51,8 @@ externalPort = 3000
 localPort = 8080
 externalPort = 8080
 
+[[ports]]
+localPort = 44851
+externalPort = 3002
+
 [agent]
