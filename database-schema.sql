@@ -10,6 +10,8 @@ CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'failed', 'refunded');
 CREATE TYPE payment_method AS ENUM ('bkash', 'nagad', 'rocket');
 CREATE TYPE homework_status AS ENUM ('pending', 'submitted', 'graded');
 CREATE TYPE user_role AS ENUM ('student', 'instructor', 'admin');
+CREATE TYPE lead_source AS ENUM ('facebook', 'google', 'organic', 'referral');
+CREATE TYPE lead_status AS ENUM ('new', 'contacted', 'converted', 'not_interested');
 
 -- Users table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS users (
@@ -130,6 +132,38 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     sent_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Course leads table (for Facebook ad prospects and lead generation)
+CREATE TABLE IF NOT EXISTS course_leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    arabic_experience VARCHAR(50), -- 'beginner', 'basic', 'intermediate'
+    interest_level VARCHAR(20) DEFAULT 'high', -- 'high', 'medium', 'low'
+    source lead_source DEFAULT 'facebook',
+    status lead_status DEFAULT 'new',
+    utm_campaign VARCHAR(100),
+    utm_source VARCHAR(100),
+    utm_medium VARCHAR(100),
+    notes TEXT,
+    contacted_at TIMESTAMPTZ,
+    converted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Chat reactions table
+CREATE TABLE IF NOT EXISTS chat_reactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    display_name VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(message_id, user_id, emoji)
+);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_enrollment_status ON users(enrollment_status);
@@ -140,6 +174,10 @@ CREATE INDEX IF NOT EXISTS idx_payment_records_user_id ON payment_records(user_i
 CREATE INDEX IF NOT EXISTS idx_payment_records_status ON payment_records(status);
 CREATE INDEX IF NOT EXISTS idx_homework_submissions_user_id ON homework_submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_class_id ON chat_messages(class_id);
+CREATE INDEX IF NOT EXISTS idx_course_leads_email ON course_leads(email);
+CREATE INDEX IF NOT EXISTS idx_course_leads_source ON course_leads(source);
+CREATE INDEX IF NOT EXISTS idx_course_leads_status ON course_leads(status);
+CREATE INDEX IF NOT EXISTS idx_course_leads_created_at ON course_leads(created_at);
 
 -- Create triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -154,6 +192,9 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_payment_records_updated_at BEFORE UPDATE ON payment_records
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_course_leads_updated_at BEFORE UPDATE ON course_leads
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Row Level Security (RLS) policies
@@ -193,3 +234,13 @@ CREATE POLICY "Users can send messages" ON chat_messages FOR INSERT WITH CHECK (
 CREATE POLICY "Anyone can view course modules" ON course_modules FOR SELECT USING (true);
 CREATE POLICY "Anyone can view live classes" ON live_classes FOR SELECT USING (true);
 CREATE POLICY "Anyone can view instructors" ON instructors FOR SELECT USING (true);
+
+-- Course leads policies (for lead generation - public access)
+ALTER TABLE course_leads ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can submit course leads" ON course_leads FOR INSERT USING (true);
+CREATE POLICY "Admins can view all leads" ON course_leads FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM users 
+        WHERE users.id = auth.uid() AND users.role = 'admin'
+    )
+);
