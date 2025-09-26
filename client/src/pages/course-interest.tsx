@@ -32,8 +32,9 @@ import {
 const leadFormSchema = z.object({
   firstName: z.string().min(2, "নাম কমপক্ষে ২টি অক্ষর হতে হবে"),
   lastName: z.string().optional(),
-  email: z.string().email("বৈধ ইমেইল ঠিকানা প্রয়োজন"),
+  email: z.string().email("বৈধ ইমেইল ঠিকানা প্রয়োজন").optional().or(z.literal("")),
   phone: z.string().min(11, "বৈধ মোবাইল নম্বর প্রয়োজন").optional().or(z.literal("")),
+  address: z.string().optional(),
   arabicExperience: z.string().min(1, "আরবি ভাষার অভিজ্ঞতা নির্বাচন করুন"),
 });
 
@@ -52,6 +53,7 @@ export default function CourseInterestPage() {
       lastName: "",
       email: "",
       phone: "",
+      address: "",
       arabicExperience: "",
     },
   });
@@ -76,8 +78,9 @@ export default function CourseInterestPage() {
       const leadData = {
         first_name: data.firstName,
         last_name: data.lastName || "",
-        email: data.email,
+        email: data.email || "",
         phone: data.phone || "",
+        address: data.address || "",
         arabic_experience: data.arabicExperience,
         source: 'facebook',
         interest_level: 'high',
@@ -241,11 +244,11 @@ export default function CourseInterestPage() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>ইমেইল ঠিকানা *</FormLabel>
+                            <FormLabel>ইমেইল ঠিকানা (ঐচ্ছিক)</FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                <Input type="email" placeholder="example@gmail.com" className="pl-10" {...field} />
+                                <Input type="email" placeholder="example@gmail.com (ঐচ্ছিক)" className="pl-10" {...field} />
                               </div>
                             </FormControl>
                             <FormMessage />
@@ -265,6 +268,21 @@ export default function CourseInterestPage() {
                                 <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="০১৭xxxxxxxx (ঐচ্ছিক)" className="pl-10" {...field} />
                               </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Address */}
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ঠিকানা (ঐচ্ছিক)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="আপনার এলাকা/জেলার নাম (ঐচ্ছিক)" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
