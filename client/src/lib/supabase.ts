@@ -353,3 +353,90 @@ export const updateHomeworkStatus = async (submissionId: string, status: string,
     .single();
   return { data, error };
 };
+
+// Course leads functions for Facebook ad prospects
+export const createCourseLead = async (leadData: {
+  first_name: string;
+  last_name?: string;
+  email: string;
+  phone?: string;
+  arabic_experience?: string;
+  interest_level?: string;
+  source?: string;
+  utm_campaign?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  notes?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('course_leads')
+    .insert({
+      ...leadData,
+      source: leadData.source || 'facebook',
+      interest_level: leadData.interest_level || 'high',
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const getCourseLead = async (leadId: string) => {
+  const { data, error } = await supabase
+    .from('course_leads')
+    .select('*')
+    .eq('id', leadId)
+    .single();
+  return { data, error };
+};
+
+export const getCourseLeads = async (filters?: {
+  status?: string;
+  source?: string;
+  limit?: number;
+}) => {
+  let query = supabase
+    .from('course_leads')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  
+  if (filters?.source) {
+    query = query.eq('source', filters.source);
+  }
+  
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  const { data, error } = await query;
+  return { data, error };
+};
+
+export const updateLeadStatus = async (leadId: string, status: string, notes?: string) => {
+  const updateData: any = { 
+    status,
+    updated_at: new Date().toISOString()
+  };
+  
+  if (notes) {
+    updateData.notes = notes;
+  }
+  
+  if (status === 'contacted') {
+    updateData.contacted_at = new Date().toISOString();
+  } else if (status === 'converted') {
+    updateData.converted_at = new Date().toISOString();
+  }
+  
+  const { data, error } = await supabase
+    .from('course_leads')
+    .update(updateData)
+    .eq('id', leadId)
+    .select()
+    .single();
+  return { data, error };
+};
