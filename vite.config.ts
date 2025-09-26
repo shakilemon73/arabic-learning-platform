@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5000,
-    allowedHosts: ["b701e81e-aae1-41f4-bd73-dfada2233ce1-00-x0gtjl2yzm9t.spock.replit.dev"], // ✅ Correct - array
+    allowedHosts: ["b0b5d4cf-af70-4ea9-808a-207b0f254306-00-2uiigz2w484m6.picard.replit.dev"], // ✅ Correct - array
     fs: {
       strict: true,
       deny: ["**/.*"],
